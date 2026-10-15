@@ -10,12 +10,13 @@ from typing import Callable
 
 import customtkinter as ctk
 
-from . import core
+from . import core, theme as T
+from .theme import FONT
 
-FONT = "Segoe UI"
-ACCENT = "#2563eb"
-GHOST = dict(fg_color="transparent", border_width=1, text_color=("gray10", "gray90"))
-DANGER = "#c2410c"
+GHOST = dict(fg_color="transparent", border_width=1, border_color=T.BORDER_CONTROL,
+             text_color=T.TEXT_NAV, hover_color=T.SURFACE_ALT)
+PRIMARY = dict(fg_color=T.ACCENT, text_color=T.ON_ACCENT, hover_color=T.ACCENT_HOVER)
+PLAIN = dict(fg_color="transparent", text_color=T.ACCENT_TEXT, hover_color=T.SURFACE_ALT)  # HIG: low-emphasis actions are text-only
 # CustomTkinter widgets are slow to build, so long lists are capped to keep the window responsive.
 MAX_ROWS = {"Duplicates": 100, "Large & Old": 200, "Empty Folders": 300}
 NAMES = ("Home", "Sort", "Duplicates", "Large & Old", "Empty Folders")
@@ -61,6 +62,42 @@ def known_folder(name: str) -> Path:
     return Path.home() / name
 
 
+def confirm(master, title: str, message: str, ok_text: str) -> bool:
+    """Modal confirm dialog in the app's theme. Cancel is the default; Esc cancels."""
+    win = ctk.CTkToplevel(master, fg_color=T.BG)
+    win.title(title)
+    win.resizable(False, False)
+    win.transient(master)
+    result = {"ok": False}
+
+    def close(ok: bool) -> None:
+        result["ok"] = ok
+        win.destroy()
+
+    card = ctk.CTkFrame(win, corner_radius=T.R_DIALOG, fg_color=T.SURFACE)
+    card.pack(padx=T.GAP, pady=T.GAP)
+    ctk.CTkLabel(card, text=title, font=(FONT, 20, "bold"), text_color=T.TEXT).pack(
+        anchor="w", padx=T.GAP + 4, pady=(T.GAP + 4, 6))
+    ctk.CTkLabel(card, text=message, font=(FONT, 15), text_color=T.TEXT_MUTED, justify="left",
+                 wraplength=420).pack(anchor="w", padx=T.GAP + 4)
+    row = ctk.CTkFrame(card, fg_color="transparent")
+    row.pack(fill="x", padx=T.GAP + 4, pady=T.GAP + 4)
+    ctk.CTkButton(row, text=ok_text, height=38, corner_radius=T.R_BUTTON, font=(FONT, 14, "bold"),
+                  command=lambda: close(True), **PRIMARY).pack(side="right")
+    cancel = ctk.CTkButton(row, text="Cancel", width=90, height=38, corner_radius=T.R_BUTTON, font=(FONT, 14),
+                           command=lambda: close(False), **GHOST)
+    cancel.pack(side="right", padx=(0, 10))
+    win.bind("<Escape>", lambda _e: close(False))
+    win.protocol("WM_DELETE_WINDOW", lambda: close(False))
+    win.update_idletasks()
+    x = master.winfo_rootx() + (master.winfo_width() - win.winfo_reqwidth()) // 2
+    y = master.winfo_rooty() + (master.winfo_height() - win.winfo_reqheight()) // 2
+    win.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+    win.after(50, lambda: (win.grab_set(), cancel.focus_set()))
+    master.wait_window(win)
+    return result["ok"]
+
+
 class Tab(ctk.CTkFrame):
     """Title, optional header row, scrollable checkbox list, and a footer with one action."""
 
@@ -74,31 +111,31 @@ class Tab(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.grid(row=0, sticky="ew")
-        ctk.CTkLabel(top, text=title, font=(FONT, 22, "bold")).pack(anchor="w")
-        ctk.CTkLabel(top, text=subtitle, font=(FONT, 13), text_color=("gray35", "gray65"),
+        ctk.CTkLabel(top, text=title, font=(FONT, T.TITLE, "bold"), text_color=T.TEXT).pack(anchor="w")
+        ctk.CTkLabel(top, text=subtitle, font=(FONT, 14), text_color=T.TEXT_MUTED,
                      wraplength=640, justify="left").pack(anchor="w", pady=(2, 0))
         self.head = ctk.CTkFrame(self, fg_color="transparent")
-        self.head.grid(row=1, sticky="ew", pady=8)
-        self.list = ctk.CTkScrollableFrame(self, corner_radius=12)
+        self.head.grid(row=1, sticky="ew", pady=T.CARD_GAP // 2)
+        self.list = ctk.CTkScrollableFrame(self, corner_radius=T.R_CARD, fg_color=T.SURFACE)
         self.list.grid(row=2, sticky="nsew")
         foot = ctk.CTkFrame(self, fg_color="transparent")
-        foot.grid(row=3, sticky="ew", pady=(14, 0))
-        self.sel_label = ctk.CTkLabel(foot, text="Selected: 0 items", font=(FONT, 13))
+        foot.grid(row=3, sticky="ew", pady=(T.CARD_GAP, 0))
+        self.sel_label = ctk.CTkLabel(foot, text="Selected: 0 items", font=(FONT, 14), text_color=T.TEXT_MUTED)
         self.sel_label.pack(side="left")
-        self.action_btn = ctk.CTkButton(foot, text=action, corner_radius=10, command=on_action,
-                                        state="disabled")
+        self.action_btn = ctk.CTkButton(foot, text=action, corner_radius=T.R_BUTTON, command=on_action,
+                                        state="disabled", font=(FONT, 14, "bold"), height=38, **PRIMARY)
         self.action_btn.pack(side="right")
-        ctk.CTkButton(foot, text="Select none", width=90, corner_radius=10, **GHOST,
-                      command=lambda: self.select_all(False)).pack(side="right", padx=(0, 10))
-        ctk.CTkButton(foot, text="Select all", width=90, corner_radius=10, **GHOST,
-                      command=lambda: self.select_all(True)).pack(side="right", padx=(0, 6))
+        ctk.CTkButton(foot, text="Select none", width=90, height=38, corner_radius=T.R_BUTTON, **PLAIN,
+                      font=(FONT, 14), command=lambda: self.select_all(False)).pack(side="right", padx=(0, 10))
+        ctk.CTkButton(foot, text="Select all", width=90, height=38, corner_radius=T.R_BUTTON, **PLAIN,
+                      font=(FONT, 14), command=lambda: self.select_all(True)).pack(side="right", padx=(0, 6))
         self.clear("Scan a folder on Home first.")
 
     _gen = 0  # bumped on every rebuild so an older, still-running chunked build stops itself
 
     def clear(self, message: str) -> None:
         self._reset()
-        ctk.CTkLabel(self.list, text=message, font=(FONT, 14)).pack(pady=40)
+        ctk.CTkLabel(self.list, text=message, font=(FONT, 15), text_color=T.TEXT_MUTED).pack(pady=40)
         self.update_selection()
 
     def _reset(self) -> None:
@@ -127,14 +164,17 @@ class Tab(ctk.CTkFrame):
             return self.clear("Nothing to clean. Nice.")
         self._reset()
         if note:
-            ctk.CTkLabel(self.list, text=note, font=(FONT, 12), anchor="w").pack(fill="x", padx=12, pady=4)
+            ctk.CTkLabel(self.list, text=note, font=(FONT, 13), text_color=T.TEXT_MUTED,
+                         anchor="w").pack(fill="x", padx=12, pady=4)
 
         def make(row) -> None:
             text, obj = row
             v = ctk.BooleanVar(value=checked)
             self.items.append((v, obj))
-            ctk.CTkCheckBox(self.list, text=text, variable=v, font=(FONT, 13),
-                            command=self.update_selection).pack(anchor="w", padx=12, pady=4)
+            ctk.CTkCheckBox(self.list, text=text, variable=v, font=(FONT, 15), text_color=T.TEXT,
+                            fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
+                            checkmark_color=T.ON_ACCENT,
+                            command=self.update_selection).pack(anchor="w", padx=12, pady=6)
 
         self._build_chunked(rows, make)
 
@@ -174,15 +214,17 @@ class DupTab(Tab):
         cap = MAX_ROWS["Duplicates"]
         if len(groups) > cap:
             ctk.CTkLabel(self.list, text=f"Showing the {cap} groups that free the most space.",
-                         font=(FONT, 12)).pack(anchor="w", padx=12, pady=4)
+                         font=(FONT, 13), text_color=T.TEXT_MUTED).pack(anchor="w", padx=12, pady=4)
 
         def make(g: core.DupGroup) -> None:
-            box = ctk.CTkFrame(self.list, corner_radius=10)
+            box = ctk.CTkFrame(self.list, corner_radius=T.R_BUTTON, fg_color=T.SURFACE_ALT)
             box.pack(fill="x", padx=6, pady=6)
             inc, keeper = ctk.BooleanVar(value=True), ctk.IntVar(value=0)
             self.groups.append((inc, keeper, g))
             ctk.CTkCheckBox(box, text=f"{g.files[0].name} · {len(g.files)} copies · "
-                                      f"{core.human_size(g.size)} each", variable=inc, font=(FONT, 13, "bold"),
+                                      f"{core.human_size(g.size)} each", variable=inc, font=(FONT, 15, "bold"),
+                            text_color=T.TEXT, fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
+                            border_color=T.BORDER_CONTROL, checkmark_color=T.ON_ACCENT,
                             command=self.update_selection).pack(anchor="w", padx=10, pady=(8, 2))
             for i, f in enumerate(g.files):
                 try:
@@ -190,7 +232,9 @@ class DupTab(Tab):
                 except ValueError:
                     shown = str(f)
                 ctk.CTkRadioButton(box, text=("Keep   " if i == 0 else "") + shown, value=i, variable=keeper,
-                                   font=(FONT, 12), command=self.update_selection).pack(anchor="w", padx=28, pady=2)
+                                   font=(FONT, 13), text_color=T.TEXT_MUTED, fg_color=T.ACCENT,
+                                   hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
+                                   command=self.update_selection).pack(anchor="w", padx=28, pady=3)
 
         self._build_chunked(groups[:cap], make, chunk=4)
 
@@ -207,10 +251,11 @@ class DupTab(Tab):
 class App(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
-        ctk.set_appearance_mode("system")  # follows the Windows theme
+        ctk.set_appearance_mode(T.load_mode().lower())  # "system" follows the Windows theme
         self.title("Declutter")
-        self.geometry("960x640")
-        self.minsize(800, 540)
+        self.configure(fg_color=T.BG)
+        self.geometry("1100x720")
+        self.minsize(860, 560)
 
         self.folder: Path | None = None
         self.moves: list[core.Move] = []
@@ -251,34 +296,53 @@ class App(ctk.CTk):
     # ---------- layout ----------
 
     def _build_sidebar(self) -> None:
-        bar = ctk.CTkFrame(self, width=190, corner_radius=0)
+        bar = ctk.CTkFrame(self, width=T.SIDEBAR_W, corner_radius=0, fg_color=T.SURFACE,
+                           border_width=1, border_color=T.BORDER)
         bar.grid(row=0, column=0, rowspan=2, sticky="ns")
-        ctk.CTkLabel(bar, text="Declutter", font=(FONT, 20, "bold")).pack(padx=20, pady=(24, 16))
+        bar.grid_propagate(False)
+        ctk.CTkLabel(bar, text="Declutter", font=(FONT, 20, "bold"), text_color=T.TEXT).pack(
+            anchor="w", padx=20, pady=(T.PAD_Y, T.GAP))
         self.nav = {}
         for name in NAMES:
-            b = ctk.CTkButton(bar, text=name, anchor="w", font=(FONT, 14), fg_color="transparent",
-                              text_color=("gray10", "gray90"), hover_color=("gray80", "gray25"),
-                              corner_radius=8, command=lambda n=name: self.show(n))
-            b.pack(fill="x", padx=12, pady=3)
+            b = ctk.CTkButton(bar, text=name, anchor="w", font=(FONT, 15), height=40, fg_color="transparent",
+                              text_color=T.TEXT_NAV, hover_color=T.SURFACE_ALT,
+                              corner_radius=T.R_NAV, command=lambda n=name: self.show(n))
+            b.pack(fill="x", padx=12, pady=2)
             self.nav[name] = b
+        ctk.CTkLabel(bar, text="Appearance", font=(FONT, 13), text_color=T.TEXT_MUTED).pack(
+            side="bottom", anchor="w", padx=20, pady=(0, 20))
+        self.theme_pick = ctk.CTkSegmentedButton(
+            bar, values=list(T.MODES), command=self._set_theme, font=(FONT, 13), fg_color=T.SURFACE_ALT,
+            selected_color=T.ACCENT, selected_hover_color=T.ACCENT_HOVER, unselected_color=T.SURFACE_ALT,
+            unselected_hover_color=T.BORDER, text_color=T.TEXT_NAV)
+        self.theme_pick.set(T.load_mode())
+        self.theme_pick.pack(side="bottom", fill="x", padx=12, pady=(0, 6))
+
+    def _set_theme(self, mode: str) -> None:
+        ctk.set_appearance_mode(mode.lower())
+        T.save_mode(mode)
 
     def show(self, name: str) -> None:
         for n, page in self.pages.items():
             page.grid_forget()
-            self.nav[n].configure(fg_color=ACCENT if n == name else "transparent",
-                                  text_color="white" if n == name else ("gray10", "gray90"))
-        self.pages[name].grid(row=0, column=1, sticky="nsew", padx=28, pady=(24, 8))
+            on = n == name
+            self.nav[n].configure(fg_color=T.ACCENT_SOFT if on else "transparent",
+                                  text_color=T.ACCENT_TEXT if on else T.TEXT_NAV)
+        self.pages[name].grid(row=0, column=1, sticky="nsew", padx=T.PAD_X, pady=(T.PAD_Y, T.GAP))
 
     def _build_statusbar(self) -> None:
         """Always visible, so progress and Cancel are reachable from every tab."""
-        bar = ctk.CTkFrame(self, corner_radius=0, height=44)
+        bar = ctk.CTkFrame(self, corner_radius=0, height=48, fg_color=T.SURFACE,
+                           border_width=1, border_color=T.BORDER)
         bar.grid(row=1, column=1, sticky="ew")
         bar.grid_columnconfigure(0, weight=1)
-        self.status = ctk.CTkLabel(bar, text="Choose a folder on Home to begin.", font=(FONT, 13), anchor="w")
-        self.status.grid(row=0, column=0, sticky="ew", padx=16, pady=10)
-        self.progress = ctk.CTkProgressBar(bar, mode="indeterminate", width=140)
-        self.cancel_btn = ctk.CTkButton(bar, text="Cancel", width=80, fg_color="gray40",
-                                        command=self._cancel.set)
+        self.status = ctk.CTkLabel(bar, text="Choose a folder on Home to begin.", font=(FONT, 14),
+                                   text_color=T.TEXT_MUTED, anchor="w")
+        self.status.grid(row=0, column=0, sticky="ew", padx=T.PAD_X, pady=12)
+        self.progress = ctk.CTkProgressBar(bar, mode="indeterminate", width=140, progress_color=T.ACCENT,
+                                           fg_color=T.SURFACE_ALT)
+        self.cancel_btn = ctk.CTkButton(bar, text="Cancel", width=80, corner_radius=T.R_BUTTON,
+                                        font=(FONT, 14), command=self._cancel.set, **GHOST)
 
     def _set_busy(self, busy: bool) -> None:
         self._busy = busy
@@ -298,45 +362,53 @@ class App(ctk.CTk):
     def _build_home(self) -> ctk.CTkFrame:
         f = ctk.CTkFrame(self, fg_color="transparent")
         f.grid_columnconfigure((0, 1), weight=1, uniform="c")
-        ctk.CTkLabel(f, text="Tidy up a folder", font=(FONT, 22, "bold")).grid(columnspan=2, sticky="w")
+        ctk.CTkLabel(f, text="Tidy up a folder", font=(FONT, T.TITLE, "bold"), text_color=T.TEXT).grid(
+            columnspan=2, sticky="w")
         ctk.CTkLabel(f, text="1. Pick a folder   2. Scan   3. Review each tab. Nothing changes until you confirm.",
-                     font=(FONT, 13), text_color=("gray35", "gray65")).grid(columnspan=2, sticky="w", pady=(2, 0))
+                     font=(FONT, 14), text_color=T.TEXT_MUTED).grid(columnspan=2, sticky="w", pady=(2, 0))
         row = ctk.CTkFrame(f, fg_color="transparent")
-        row.grid(columnspan=2, sticky="w", pady=16)
+        row.grid(columnspan=2, sticky="w", pady=T.GAP)
         for label in ("Downloads", "Desktop", "Documents"):
-            ctk.CTkButton(row, text=label, font=(FONT, 14), corner_radius=10, width=120,
-                          command=lambda l=label: self.set_folder(known_folder(l))).pack(side="left", padx=(0, 10))
-        ctk.CTkButton(row, text="Choose folder…", font=(FONT, 14), corner_radius=10, width=140,
+            ctk.CTkButton(row, text=label, font=(FONT, 15), corner_radius=T.R_BUTTON, width=120, height=40,
+                          command=lambda l=label: self.set_folder(known_folder(l)), **GHOST
+                          ).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(row, text="Choose folder…", font=(FONT, 15), corner_radius=T.R_BUTTON, width=140, height=40,
                       command=self.choose_folder, **GHOST).pack(side="left")
-        self.folder_label = ctk.CTkLabel(f, text="No folder chosen yet", font=(FONT, 14), anchor="w")
+        self.folder_label = ctk.CTkLabel(f, text="No folder chosen yet", font=(FONT, 15),
+                                         text_color=T.TEXT_MUTED, anchor="w")
         self.folder_label.grid(columnspan=2, sticky="w")
         self.scan_btn = ctk.CTkButton(f, text="Scan", font=(FONT, 16, "bold"), height=44, width=160,
-                                      corner_radius=12, state="disabled", command=self.scan)
-        self.scan_btn.grid(columnspan=2, sticky="w", pady=20)
+                                      corner_radius=T.R_BUTTON, state="disabled", command=self.scan, **PRIMARY)
+        self.scan_btn.grid(columnspan=2, sticky="w", pady=T.GAP)
         self.cards: dict[str, ctk.CTkButton] = {}
         for name in NAMES[1:]:
             self.cards[name] = ctk.CTkButton(
-                f, text="", font=(FONT, 16), height=80, corner_radius=14, fg_color=("gray85", "gray20"),
-                text_color=("gray10", "gray90"), hover_color=("gray75", "gray30"),
+                f, text="", font=(FONT, 16), height=88, corner_radius=T.R_CARD, fg_color=T.SURFACE,
+                text_color=T.TEXT, hover_color=T.SURFACE_ALT,
                 command=lambda n=name: self.show(n))  # gridded after the first scan
         return f
 
     def _build_sort_header(self) -> None:
         self.recursive = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(self.sort.head, text="Include subfolders", variable=self.recursive, font=(FONT, 13),
+        ctk.CTkCheckBox(self.sort.head, text="Include subfolders", variable=self.recursive, font=(FONT, 15),
+                        text_color=T.TEXT, fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
+                        border_color=T.BORDER_CONTROL, checkmark_color=T.ON_ACCENT,
                         command=self.resort).pack(side="left")
-        self.undo_btn = ctk.CTkButton(self.sort.head, text="Undo last sort", corner_radius=10,
-                                      command=self.undo, **GHOST)
+        self.undo_btn = ctk.CTkButton(self.sort.head, text="Undo last sort", corner_radius=T.R_BUTTON, height=38,
+                                      font=(FONT, 14), command=self.undo, **GHOST)
         self.undo_btn.pack(side="right")
 
     def _build_large_header(self) -> None:
         self.min_mb, self.older = ctk.StringVar(value="100"), ctk.StringVar(value="0")
         for label, var in (("Bigger than (MB)", self.min_mb), ("Older than (days)", self.older)):
-            ctk.CTkLabel(self.large.head, text=label, font=(FONT, 13)).pack(side="left", padx=(0, 6))
-            ctk.CTkEntry(self.large.head, textvariable=var, width=70).pack(side="left", padx=(0, 16))
-        ctk.CTkLabel(self.large.head, text="0 turns a filter off", font=(FONT, 12)).pack(side="left")
-        ctk.CTkButton(self.large.head, text="Apply", width=80, corner_radius=10,
-                      command=self.refilter).pack(side="right")
+            ctk.CTkLabel(self.large.head, text=label, font=(FONT, 14), text_color=T.TEXT).pack(
+                side="left", padx=(0, 6))
+            ctk.CTkEntry(self.large.head, textvariable=var, width=70, fg_color=T.SURFACE, text_color=T.TEXT,
+                         border_color=T.BORDER_CONTROL, corner_radius=T.R_BUTTON).pack(side="left", padx=(0, 16))
+        ctk.CTkLabel(self.large.head, text="0 turns a filter off", font=(FONT, 13),
+                     text_color=T.TEXT_MUTED).pack(side="left")
+        ctk.CTkButton(self.large.head, text="Apply", width=80, height=38, corner_radius=T.R_BUTTON,
+                      font=(FONT, 14), command=self.refilter, **GHOST).pack(side="right")
 
     # ---------- folder + background work ----------
 
@@ -516,9 +588,9 @@ class App(ctk.CTk):
 
     def move(self) -> None:
         sel = self._sort_selected()
-        if sel and messagebox.askyesno(
-                "Move files?", f"Move {plural(len(sel), 'file')} into type folders inside\n{self.folder}?\n\n"
-                "Nothing is deleted. You can undo this with \"Undo last sort\"."):
+        if sel and confirm(
+                self, "Move files?", f"Move {plural(len(sel), 'file')} into type folders inside\n{self.folder}?\n\n"
+                "Nothing is deleted. You can undo this with \"Undo last sort\".", "Move files"):
             folder = self.folder
             self._run(lambda: core.apply_moves(sel, folder), self._move_done)
 
@@ -530,7 +602,7 @@ class App(ctk.CTk):
     def undo(self) -> None:
         if not core.can_undo():
             return messagebox.showinfo("Undo", "Nothing to undo.")
-        if messagebox.askyesno("Undo last sort?", "Put the files from the last sort back where they were?"):
+        if confirm(self, "Undo last sort?", "Put the files from the last sort back where they were?", "Undo"):
             self._run(core.undo_last, self._undo_done)
 
     def _undo_done(self, result: tuple[int, list[str]]) -> None:
@@ -563,11 +635,10 @@ class App(ctk.CTk):
             folder = self.folder
             self._run(lambda: core.trash_duplicates(removals, folder), self._recycled)
 
-    @staticmethod
-    def _confirm_bin(n: int) -> bool:
-        return messagebox.askyesno(
-            "Send to Recycle Bin?", f"Send {plural(n, 'item')} to the Recycle Bin?\n\n"
-            "They are not deleted. You can restore them from the Recycle Bin.")
+    def _confirm_bin(self, n: int) -> bool:
+        return confirm(
+            self, "Send to Recycle Bin?", f"Send {plural(n, 'item')} to the Recycle Bin?\n\n"
+            "They are not deleted. You can restore them from the Recycle Bin.", f"Send {plural(n, 'item')}")
 
     def recycle(self, paths: list[Path]) -> None:
         if paths and self._confirm_bin(len(paths)):

@@ -23,6 +23,13 @@ ArchitecturesInstallIn64BitMode=x64compatible
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop icon"; Flags: unchecked
+Name: "contextmenu"; Description: "Add ""Tidy with Declutter"" to the folder right-click menu"; Flags: unchecked
+
+[Registry]
+; Per-user (HKCU), so no admin rights; removed again on uninstall.
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\Declutter"; ValueType: string; ValueName: ""; ValueData: "Tidy with Declutter"; Flags: uninsdeletekey; Tasks: contextmenu
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\Declutter"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\Declutter.exe"; Tasks: contextmenu
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\Declutter\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Declutter.exe"" ""%1"""; Tasks: contextmenu
 
 [Files]
 Source: "..\dist\Declutter\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion

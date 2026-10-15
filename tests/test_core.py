@@ -9,13 +9,6 @@ import pytest
 from declutter import core
 
 
-@pytest.fixture(autouse=True)
-def isolated_log(tmp_path, monkeypatch):
-    log_dir = tmp_path / "_log"
-    monkeypatch.setattr(core, "LOG_DIR", log_dir)
-    monkeypatch.setattr(core, "UNDO_LOG", log_dir / "undo.json")
-
-
 @pytest.fixture
 def root(tmp_path):
     r = tmp_path / "messy"
@@ -23,12 +16,12 @@ def root(tmp_path):
     return r
 
 
-def touch(p: Path, data: bytes = b"x", age_days: float = 0) -> Path:
+def touch(p: Path, data: bytes = b"x", age_days: float = 0.1) -> Path:
+    """Write a file, backdated: files changed in the last 5 minutes are skipped as in use."""
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_bytes(data)
-    if age_days:
-        t = time.time() - age_days * 86400
-        os.utime(p, (t, t))
+    t = time.time() - age_days * 86400
+    os.utime(p, (t, t))
     return p
 
 
@@ -76,22 +69,11 @@ def test_sort_plan_categories(root):
                     "e.zip": "Archives", "f.exe": "Installers", "g.py": "Code", "h.xyz": "Other"}
 
 
-def test_sort_top_level_only_by_default(root):
-    touch(root / "a.txt")
-    touch(root / "sub" / "b.txt")
-    assert [m.src.name for m in core.plan_sort(root)] == ["a.txt"]
-    assert sorted(m.src.name for m in core.plan_sort(root, recursive=True)) == ["a.txt", "b.txt"]
-
-
-def test_sort_collisions_within_batch_and_on_disk(root):
+def test_sort_collisions_on_disk(root):
     touch(root / "Documents" / "a.txt", b"old")  # already on disk
+    touch(root / "Documents" / "a (1).txt", b"older")
     touch(root / "a.txt", b"1")
-    touch(root / "s1" / "a.txt", b"2")
-    touch(root / "s2" / "a.txt", b"3")
-    moves = core.plan_sort(root, recursive=True)
-    names = sorted(m.dst.name for m in moves)
-    assert names == ["a (1).txt", "a (2).txt", "a (3).txt"]
-    assert len({str(m.dst).lower() for m in moves}) == 3
+    assert [m.dst.name for m in core.plan_sort(root)] == ["a (2).txt"]
 
 
 def test_sort_skips_hidden_and_symlinks(root):
@@ -100,7 +82,6 @@ def test_sort_skips_hidden_and_symlinks(root):
     hide(h)
     touch(root / "ok.txt")
     assert [m.src.name for m in core.plan_sort(root)] == ["ok.txt"]
-    assert [m.src.name for m in core.plan_sort(root, recursive=True)] == ["ok.txt"]
 
 
 def test_sort_skips_symlink(root):
@@ -212,7 +193,7 @@ def test_empty_dirs_nested_deepest_first(root):
 
 
 def test_empty_dirs_hidden_and_protected_not_listed(root):
-    (root / "node_modules").mkdir()
+    (root / "AppData").mkdir()
     (root / ".cache").mkdir()
     (root / "plain").mkdir()
     assert core.find_empty_dirs(root) == [root / "plain"]
@@ -253,7 +234,7 @@ def test_junction_not_followed(root):
     if r.returncode:
         pytest.skip("cannot create junction")
     touch(root / "a.txt")
-    assert [m.src.name for m in core.plan_sort(root, recursive=True)] == ["a.txt"]
+    assert [p.name for p, _ in core.scan_entries(root)] == ["a.txt"]
     assert core.find_empty_dirs(root) == []
 
 
@@ -261,8 +242,7 @@ def test_shared_entries_match_separate_walks(root):
     touch(root / "a.bin", b"same", age_days=3)
     touch(root / "s" / "b.bin", b"same")
     entries = core.scan_entries(root)
-    assert [m.src for m in core.plan_sort(root, True, entries=entries)] == \
-           [m.src for m in core.plan_sort(root, True)]
+    assert [m.src for m in core.plan_sort(root, entries=entries)] == [m.src for m in core.plan_sort(root)]
     assert len(core.find_duplicates(root, entries=entries)) == 1
 
 

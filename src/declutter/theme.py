@@ -34,6 +34,7 @@ _SETTINGS = core.LOG_DIR / "settings.json"
 
 
 def load_settings() -> dict:
+    core.migrate(core.OLD_LOG_DIR / _SETTINGS.name, _SETTINGS)
     try:
         data = json.loads(_SETTINGS.read_text(encoding="utf-8"))
     except (OSError, ValueError):

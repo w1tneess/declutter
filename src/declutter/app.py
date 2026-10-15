@@ -594,11 +594,8 @@ class App(ctk.CTk):
         return f
 
     def _build_sort_header(self) -> None:
-        self.recursive = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(self.sort.head, text="Include subfolders", variable=self.recursive, font=(FONT, 15),
-                        text_color=T.TEXT, fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
-                        border_color=T.BORDER_CONTROL, checkmark_color=T.ON_ACCENT,
-                        command=self.resort).pack(side="left")
+        ctk.CTkLabel(self.sort.head, text="Only loose files directly in this folder are sorted.", font=(FONT, 13.5),
+                     text_color=T.TEXT_MUTED).pack(side="left")
         self.undo_btn = ctk.CTkButton(self.sort.head, text="Undo last sort", corner_radius=T.R_BUTTON, height=38,
                                       font=(FONT, 14), command=self.undo, **GHOST)
         self.undo_btn.pack(side="right")
@@ -721,12 +718,12 @@ class App(ctk.CTk):
         params = self._large_params()
         if not self.folder or not params:
             return
-        folder, rec, c, p = self.folder, self.recursive.get(), self._cancel.is_set, self._progress
+        folder, c, p = self.folder, self._cancel.is_set, self._progress
 
         def work():
             p("Reading the folder…")
             entries = core.scan_entries(folder, cancel=c)  # one walk shared by all checks
-            moves = core.plan_sort(folder, rec, cancel=c, entries=entries)
+            moves = core.plan_sort(folder, cancel=c, entries=entries)
             dups = core.find_duplicates(folder, progress=p, cancel=c, entries=entries)
             large = core.find_large_old(folder, *params, cancel=c, entries=entries)
             p("Looking for empty folders…")
@@ -806,13 +803,6 @@ class App(ctk.CTk):
 
     # ---------- sort actions ----------
 
-    def resort(self) -> None:
-        if not self.folder:
-            return
-        folder, rec, c, entries = self.folder, self.recursive.get(), self._cancel.is_set, self.entries
-        self._run(lambda: core.plan_sort(folder, rec, cancel=c, entries=entries or core.scan_entries(folder, c)),
-                  self._fill_sort)
-
     def move(self) -> None:
         sel = self._sort_selected()
         if sel and confirm(
@@ -885,6 +875,8 @@ class App(ctk.CTk):
         """Problems need reading, so they get a dialog; plain success is a toast that needs no click."""
         if errors:
             msg += f"\n\n{len(errors)} had problems:\n" + "\n".join(errors[:8])
+            if len(errors) > 8:
+                msg += f"\n…and {len(errors) - 8} more."
             return messagebox.showwarning(title, msg)
         self.toast(msg)
 

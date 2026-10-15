@@ -4,7 +4,6 @@ from __future__ import annotations
 import queue
 import subprocess
 import threading
-from collections import Counter
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Callable
@@ -51,7 +50,6 @@ def known_folder(name: str) -> Path:
     """Real location of Downloads/Desktop/Documents; falls back to ~/<name>."""
     try:
         import ctypes
-        from ctypes import wintypes
         import uuid
         guid = uuid.UUID(_KNOWN[name])
         g = (ctypes.c_byte * 16).from_buffer_copy(guid.bytes_le)
@@ -102,7 +100,7 @@ def confirm(master, title: str, message: str, ok_text: str) -> bool:
     x = master.winfo_rootx() + (master.winfo_width() - win.winfo_reqwidth()) // 2
     y = master.winfo_rooty() + (master.winfo_height() - win.winfo_reqheight()) // 2
     win.geometry(f"+{max(x, 0)}+{max(y, 0)}")
-    win.after(50, lambda: (win.grab_set(), cancel.focus_set()))
+    win.after(50, lambda: win.winfo_exists() and (win.grab_set(), cancel.focus_set()))  # Esc within 50 ms
     master.wait_window(win)
     return result["ok"]
 
@@ -139,7 +137,7 @@ class Tab(ctk.CTkFrame):
             self.search.grid(row=0, column=1, sticky="e")
             self.search.bind("<KeyRelease>", lambda _e: self._filter_soon())
             self.search.bind("<Escape>", lambda _e: (self.search.delete(0, "end"), self._filter_soon()))
-        self.head = ctk.CTkFrame(self, fg_color="transparent")
+        self.head = ctk.CTkFrame(self, fg_color="transparent", height=0)  # default 200 px leaves a gap when empty
         self.head.grid(row=1, sticky="ew", pady=T.CARD_GAP // 2)
         self.list = ctk.CTkScrollableFrame(self, corner_radius=T.R_CARD, fg_color=T.SURFACE)
         self.list.grid(row=2, sticky="nsew")
@@ -280,17 +278,26 @@ class DupTab(Tab):
                             text_color=T.TEXT, fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
                             border_color=T.BORDER_CONTROL, checkmark_color=T.ON_ACCENT,
                             command=self.update_selection).pack(anchor="w", padx=10, pady=(8, 2))
+            radios = []
+
+            def relabel() -> None:  # "Keep" must follow the chosen copy, or the label points at a file being removed
+                for i, (rb, shown) in enumerate(radios):
+                    rb.configure(text=("Keep   " if i == keeper.get() else "") + shown)
+                self.update_selection()
+
             for i, f in enumerate(g.files):
                 try:
                     shown = str(f.relative_to(base))
                 except ValueError:
                     shown = str(f)
-                rb = ctk.CTkRadioButton(box, text=("Keep   " if i == 0 else "") + shown, value=i, variable=keeper,
+                rb = ctk.CTkRadioButton(box, text="", value=i, variable=keeper,
                                         font=(FONT, 13), text_color=T.TEXT_MUTED, fg_color=T.ACCENT,
                                         hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
-                                        command=self.update_selection)
+                                        command=relabel)
                 rb.bind("<Double-Button-1>", lambda _e, p=f: reveal(p))
                 rb.pack(anchor="w", padx=28, pady=3)
+                radios.append((rb, shown))
+            relabel()
             self._add_row(box, " ".join(f.name for f in g.files), fill="x", padx=6, pady=6)
 
         self._build_chunked(groups[:cap], make, chunk=4)
@@ -353,9 +360,15 @@ class App(ctk.CTk):
         self.show("Home")
         self.report_callback_exception = self._on_ui_error
         self.after(100, self._poll)
+        self.after(300, self._fit_screen)
         last = self.settings.get("last_folder")
         if self.settings.get("reopen") and last and core.check_root(last)[0]:
             self.set_folder(Path(last))
+
+    def _fit_screen(self) -> None:
+        """1100x720 at 150% scaling is taller than a 1080p screen, hiding the action buttons; fill the screen then."""
+        if self.winfo_height() > self.winfo_screenheight() - 80 or self.winfo_width() > self.winfo_screenwidth():
+            self.state("zoomed")
 
     def _on_ui_error(self, exc_type, exc, tb) -> None:
         """Last line of defence: a bug in a callback shows a dialog instead of freezing the app."""
@@ -382,8 +395,11 @@ class App(ctk.CTk):
             self.nav[name] = b
 
     def _build_settings(self) -> ctk.CTkFrame:
-        """Grouped rows in the style of macOS System Settings. Every change saves immediately."""
-        f = ctk.CTkFrame(self, fg_color="transparent")
+        """Grouped rows in the style of macOS System Settings. Every change saves immediately.
+
+        Scrollable, because at 150% display scaling in a small window the last rows don't fit.
+        """
+        f = ctk.CTkScrollableFrame(self, fg_color="transparent")
         ctk.CTkLabel(f, text="Settings", font=(FONT, T.TITLE, "bold"), text_color=T.TEXT).pack(anchor="w")
 
         def group(title: str) -> ctk.CTkFrame:
@@ -454,15 +470,16 @@ class App(ctk.CTk):
         self.cancel_btn = ctk.CTkButton(bar, text="Cancel", width=80, corner_radius=T.R_BUTTON,
                                         font=(FONT, 14), command=self._cancel.set, **GHOST)
 
-    def _set_busy(self, busy: bool) -> None:
+    def _set_busy(self, busy: bool, cancellable: bool = True) -> None:
         self._busy = busy
         for t in self.tabs:
             t.locked = busy
             t.update_selection()
         self.scan_btn.configure(state="disabled" if busy or not self.folder else "normal")
         if busy:
-            self.progress.grid(row=0, column=1, padx=8)
-            self.cancel_btn.grid(row=0, column=2, padx=(0, 16))
+            self.progress.grid(row=0, column=1, padx=(8, 8 if cancellable else 16))
+            if cancellable:
+                self.cancel_btn.grid(row=0, column=2, padx=(0, 16))
             self.progress.start()
         else:
             self.progress.stop()
@@ -560,12 +577,16 @@ class App(ctk.CTk):
     def _progress(self, text: str) -> None:
         self._events.put((None, text))
 
-    def _run(self, work, done) -> None:
-        """Run work() on a thread; call done(result) on the UI thread, or show the error."""
+    def _run(self, work, done, cancellable: bool = True) -> None:
+        """Run work() on a thread; call done(result) on the UI thread, or show the error.
+
+        Moves and Recycle Bin jobs can't be stopped halfway, so they get no Cancel button and
+        their result is always reported.
+        """
         if self._busy:
             return self.status.configure(text="Still working. Please wait a moment.")
         self._cancel.clear()
-        self._set_busy(True)
+        self._set_busy(True, cancellable)
 
         def target():
             try:
@@ -654,7 +675,7 @@ class App(ctk.CTk):
         }
         for i, (name, card) in enumerate(self.cards.items()):
             card.configure(text=texts[name] + ("\nNothing to clean. Nice." if not counts[name] else "\nClick to review"))
-            card.grid(row=3 + i // 2, column=i % 2, sticky="ew", padx=6, pady=6)
+            card.grid(row=5 + i // 2, column=i % 2, sticky="ew", padx=6, pady=6)  # rows 0-4: title … Scan button
             self.nav[name].configure(text=f"{name}  ({counts[name]})" if counts[name] else name)
         total = sum(counts.values())
         self.status.configure(text="Scan finished. Review the cards below." if total
@@ -716,7 +737,7 @@ class App(ctk.CTk):
                 self, "Move files?", f"Move {plural(len(sel), 'file')} into type folders inside\n{self.folder}?\n\n"
                 "Nothing is deleted. You can undo this with \"Undo last sort\".", "Move files"):
             folder = self.folder
-            self._run(lambda: core.apply_moves(sel, folder), self._move_done)
+            self._run(lambda: core.apply_moves(sel, folder), self._move_done, cancellable=False)
 
     def _move_done(self, result: tuple[int, list[str]]) -> None:
         self._report("Done", f"Moved {plural(result[0], 'file')}.", result[1])
@@ -727,7 +748,7 @@ class App(ctk.CTk):
         if not core.can_undo():
             return messagebox.showinfo("Undo", "Nothing to undo.")
         if confirm(self, "Undo last sort?", "Put the files from the last sort back where they were?", "Undo"):
-            self._run(core.undo_last, self._undo_done)
+            self._run(core.undo_last, self._undo_done, cancellable=False)
 
     def _undo_done(self, result: tuple[int, list[str]]) -> None:
         self._report("Undo", f"Restored {plural(result[0], 'file')}.", result[1])
@@ -757,7 +778,7 @@ class App(ctk.CTk):
         n = sum(len(rem) for _, rem in removals)
         if n and self._confirm_bin(n):
             folder = self.folder
-            self._run(lambda: core.trash_duplicates(removals, folder), self._recycled)
+            self._run(lambda: core.trash_duplicates(removals, folder), self._recycled, cancellable=False)
 
     def _confirm_bin(self, n: int) -> bool:
         return confirm(
@@ -767,12 +788,12 @@ class App(ctk.CTk):
     def recycle(self, paths: list[Path]) -> None:
         if paths and self._confirm_bin(len(paths)):
             folder = self.folder
-            self._run(lambda: core.to_recycle_bin(paths, folder), self._recycled)
+            self._run(lambda: core.to_recycle_bin(paths, folder), self._recycled, cancellable=False)
 
     def recycle_empty(self, paths: list[Path]) -> None:
         if paths and self._confirm_bin(len(paths)):
             folder = self.folder
-            self._run(lambda: core.trash_empty_dirs(paths, folder), self._recycled)
+            self._run(lambda: core.trash_empty_dirs(paths, folder), self._recycled, cancellable=False)
 
     def _recycled(self, result: tuple[int, list[str]]) -> None:
         self._report("Done", f"Sent {plural(result[0], 'item')} to the Recycle Bin. Restore them from the Bin if needed.", result[1])

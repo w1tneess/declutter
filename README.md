@@ -9,6 +9,12 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 - **Duplicates**: finds identical files (size, then SHA-256). Keeps the oldest copy unless you choose another.
 - **Large & old**: finds big or long-untouched files.
 - **Empty folders**: finds folders with no files at any depth.
+- **Filter by name** on each list. Only the rows you can see count as selected, so nothing hidden is ever removed.
+- **Double-click** a file or folder to see it in Explorer (it is never opened).
+- **Settings**: theme (System, Light, Dark), reopen the last folder at start, and the Large & old filters, all remembered.
+
+![Duplicates, light theme](docs/screenshot-duplicates.png)
+![Large & old files, dark theme](docs/screenshot-dark.png)
 
 Removals go to the Recycle Bin. Drive roots, your home folder, Windows, Program Files, AppData, `.git` and `node_modules` are refused. Symlinks, junctions and hidden files are skipped.
 
@@ -24,6 +30,12 @@ python -m declutter
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
+
+Before a release, also run the GUI checks (opens real windows, uses temp folders only): a 10,000-file folder without freezing, cancelling a scan, both themes, 100/125/150% scaling.
+```
+python tests/gui_check.py
+```
+With Pillow installed (`pip install pillow`) it saves screenshots to `.pytest_tmp/shots` for a visual check.
 
 ## Known limitations
 - The `.exe` is unsigned, so Windows SmartScreen shows "Unknown publisher" (More info, then Run anyway).

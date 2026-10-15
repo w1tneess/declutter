@@ -50,4 +50,6 @@ Palette, radii and flat cards now follow Apple's system look (grouped surfaces, 
 
 Button hierarchy (HIG): one filled accent button per view (Scan on Home, the footer action on each tab, the confirm button in dialogs). Secondary actions (folder shortcuts, Choose folder, Apply, Undo, Cancel) are bordered. Low-emphasis actions (Select all / none) are plain accent text.
 
+Settings page: grouped cards in the style of macOS System Settings (Appearance, Start-up, Large & old files); every change saves at once. The page scrolls, so it still fits at 150% scaling in the minimum window. If the 1100 x 720 design size does not fit the screen (for example 1080p at 150%), the window opens maximised.
+
 Accent is `#0071E3`, not system blue `#007AFF`: white on `#007AFF` is about 4:1, below 4.5:1 for normal text. Muted text is `#6E6E73` / `#98989D` rather than Apple's translucent secondaryLabel for the same reason. Contrast figures are from published values, not measured in-app.

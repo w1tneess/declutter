@@ -1,24 +1,66 @@
-# Python
+# Claude & AI Agent artifacts
+.claude/
+
+# Python & Virtual Environments
 __pycache__/
 *.py[cod]
+*$py.class
 .venv/
 venv/
+ENV/
+env/
 *.egg-info/
+.eggs/
 
-# Test / tooling
+# Testing & Coverage
 .pytest_cache/
 .pytest_tmp/
 .coverage
+.coverage.*
 htmlcov/
+.tox/
+.nox/
 
-# Build output
+# PyInstaller & Desktop App Build Output
 build/
 dist/
 *.spec.bak
 Output/
 
-# Editors / OS
-.vscode/
+# Node.js & Website Build Artifacts
+node_modules/
+website/dist/
+dist-ssr/
+.vercel/
+*.local
+.env
+.env.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editors & IDEs
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# Operating System Files
 Thumbs.db
-desktop.ini
+ehthumbs.db
+[Dd]esktop.ini
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes

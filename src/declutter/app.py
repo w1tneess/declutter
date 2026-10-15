@@ -15,7 +15,7 @@ from .theme import FONT
 
 GHOST = dict(fg_color="transparent", border_width=1, border_color=T.BORDER_CONTROL,
              text_color=T.TEXT_NAV, hover_color=T.SURFACE_ALT)
-PRIMARY = dict(fg_color=T.ACCENT, text_color=T.ON_ACCENT, hover_color=T.ACCENT_HOVER)
+PRIMARY = dict(fg_color=T.ACCENT, text_color=T.ON_ACCENT, hover_color=T.ACCENT_HOVER, text_color_disabled=T.TEXT_MUTED)
 PLAIN = dict(fg_color="transparent", text_color=T.ACCENT_TEXT, hover_color=T.SURFACE_ALT)  # HIG: low-emphasis actions are text-only
 # CustomTkinter widgets are slow to build, so long lists are capped to keep the window responsive.
 MAX_ROWS = {"Duplicates": 100, "Large & Old": 200, "Empty Folders": 300}
@@ -63,6 +63,62 @@ def known_folder(name: str) -> Path:
     return Path.home() / name
 
 
+def set_primary(btn, on: bool) -> None:
+    """A disabled filled button must not stay bright blue, or it reads as clickable."""
+    btn.configure(state="normal" if on else "disabled", fg_color=T.ACCENT if on else T.SURFACE_ALT)
+
+
+def animations_on() -> bool:
+    """Windows Settings > Accessibility > Animation effects. Motion is skipped when it is off."""
+    try:
+        import ctypes
+        on = ctypes.c_int(1)
+        ctypes.windll.user32.SystemParametersInfoW(0x1042, 0, ctypes.byref(on), 0)  # SPI_GETCLIENTAREAANIMATION
+        return bool(on.value)
+    except Exception:
+        return True
+
+
+ANIMATE = animations_on()
+
+
+def fade_in(win, ms: int = 180) -> None:
+    """Fade a window in. Any failure leaves it fully visible, never stuck transparent."""
+    if not ANIMATE:
+        return
+    steps = 9
+
+    def step(i: int) -> None:
+        try:
+            if win.winfo_exists():
+                win.attributes("-alpha", i / steps)
+                if i < steps:
+                    win.after(ms // steps, step, i + 1)
+        except Exception:
+            win.attributes("-alpha", 1.0)
+
+    try:
+        win.attributes("-alpha", 0.0)
+        win.after(10, step, 1)
+    except Exception:
+        pass
+
+
+def count_up(label, n: int, ms: int = 450) -> None:
+    """Animate a number label from 0 to n with an ease-out, ending exactly on n."""
+    if not ANIMATE or n <= 0:
+        return label.configure(text=f"{n:,}")
+    steps = 15
+
+    def step(i: int) -> None:
+        if label.winfo_exists():
+            label.configure(text=f"{round(n * (1 - (1 - i / steps) ** 3)):,}")
+            if i < steps:
+                label.after(ms // steps, step, i + 1)
+
+    step(1)
+
+
 def reveal(p: Path) -> None:
     """Show the item selected in Explorer. Never opens it: that could run an installer."""
     if p.exists():
@@ -100,6 +156,7 @@ def confirm(master, title: str, message: str, ok_text: str) -> bool:
     x = master.winfo_rootx() + (master.winfo_width() - win.winfo_reqwidth()) // 2
     y = master.winfo_rooty() + (master.winfo_height() - win.winfo_reqheight()) // 2
     win.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+    fade_in(win, 140)
     win.after(50, lambda: win.winfo_exists() and (win.grab_set(), cancel.focus_set()))  # Esc within 50 ms
     master.wait_window(win)
     return result["ok"]
@@ -245,7 +302,7 @@ class Tab(ctk.CTkFrame):
         if self._q:
             text += f"  ·  {sum(self._shown())} of {len(self.rows)} shown"
         self.sel_label.configure(text=text)
-        self.action_btn.configure(state="normal" if sel and not self.locked else "disabled")
+        set_primary(self.action_btn, bool(sel) and not self.locked)
 
 
 class DupTab(Tab):
@@ -282,7 +339,9 @@ class DupTab(Tab):
 
             def relabel() -> None:  # "Keep" must follow the chosen copy, or the label points at a file being removed
                 for i, (rb, shown) in enumerate(radios):
-                    rb.configure(text=("Keep   " if i == keeper.get() else "") + shown)
+                    keep = i == keeper.get()
+                    rb.configure(text=("Keep   " if keep else "") + shown,
+                                 text_color=T.ACCENT_TEXT if keep else T.TEXT_MUTED)
                 self.update_selection()
 
             for i, f in enumerate(g.files):
@@ -361,6 +420,10 @@ class App(ctk.CTk):
         self.report_callback_exception = self._on_ui_error
         self.after(100, self._poll)
         self.after(300, self._fit_screen)
+        fade_in(self, 220)
+        self.bind("<Control-f>", lambda _e: self._focus_filter())
+        for i, name in enumerate(NAMES + ("Settings",), 1):
+            self.bind(f"<Control-Key-{i}>", lambda _e, n=name: self.show(n))
         last = self.settings.get("last_folder")
         if self.settings.get("reopen") and last and core.check_root(last)[0]:
             self.set_folder(Path(last))
@@ -455,6 +518,12 @@ class App(ctk.CTk):
             self.nav[n].configure(fg_color=T.ACCENT_SOFT if on else "transparent",
                                   text_color=T.ACCENT_TEXT if on else T.TEXT_NAV)
         self.pages[name].grid(row=0, column=1, sticky="nsew", padx=T.PAD_X, pady=(T.PAD_Y, T.GAP))
+        self.current = name
+
+    def _focus_filter(self) -> None:
+        search = getattr(self.pages[self.current], "search", None)
+        if search is not None:
+            search.focus_set()
 
     def _build_statusbar(self) -> None:
         """Always visible, so progress and Cancel are reachable from every tab."""
@@ -475,7 +544,7 @@ class App(ctk.CTk):
         for t in self.tabs:
             t.locked = busy
             t.update_selection()
-        self.scan_btn.configure(state="disabled" if busy or not self.folder else "normal")
+        set_primary(self.scan_btn, not busy and self.folder is not None)
         if busy:
             self.progress.grid(row=0, column=1, padx=(8, 8 if cancellable else 16))
             if cancellable:
@@ -507,12 +576,21 @@ class App(ctk.CTk):
         self.scan_btn = ctk.CTkButton(f, text="Scan", font=(FONT, 16, "bold"), height=44, width=160,
                                       corner_radius=T.R_BUTTON, state="disabled", command=self.scan, **PRIMARY)
         self.scan_btn.grid(columnspan=2, sticky="w", pady=T.GAP)
-        self.cards: dict[str, ctk.CTkButton] = {}
+        set_primary(self.scan_btn, False)
+        # Summary cards: big number over a muted caption (DESIGN.md "card number 34"). Gridded after a scan.
+        self.cards: dict[str, tuple[ctk.CTkFrame, ctk.CTkLabel, ctk.CTkLabel]] = {}
         for name in NAMES[1:]:
-            self.cards[name] = ctk.CTkButton(
-                f, text="", font=(FONT, 16), height=88, corner_radius=T.R_CARD, fg_color=T.SURFACE,
-                text_color=T.TEXT, hover_color=T.SURFACE_ALT,
-                command=lambda n=name: self.show(n))  # gridded after the first scan
+            card = ctk.CTkFrame(f, corner_radius=T.R_CARD, fg_color=T.SURFACE, cursor="hand2")
+            num = ctk.CTkLabel(card, text="0", font=(FONT, 34, "bold"), text_color=T.TEXT, cursor="hand2")
+            cap = ctk.CTkLabel(card, text="", font=(FONT, 14), text_color=T.TEXT_MUTED, justify="left",
+                               cursor="hand2")
+            num.pack(anchor="w", padx=20, pady=(14, 0))
+            cap.pack(anchor="w", padx=20, pady=(0, 16))
+            for w in (card, num, cap):
+                w.bind("<Button-1>", lambda _e, n=name: self.show(n))
+                w.bind("<Enter>", lambda _e, c=card: c.configure(fg_color=T.SURFACE_ALT))
+                w.bind("<Leave>", lambda _e, c=card: c.configure(fg_color=T.SURFACE))
+            self.cards[name] = (card, num, cap)
         return f
 
     def _build_sort_header(self) -> None:
@@ -559,9 +637,9 @@ class App(ctk.CTk):
         self.entries = None
         T.save_settings(last_folder=str(self.folder))
         self.folder_label.configure(text=f"Folder: {self.folder}")
-        self.scan_btn.configure(state="normal")
-        for c in self.cards.values():
-            c.grid_forget()
+        set_primary(self.scan_btn, True)
+        for card, _, _ in self.cards.values():
+            card.grid_forget()
         for name, t in zip(NAMES[1:], self.tabs):
             t.clear("Press Scan on Home to look through this folder.")
             self.nav[name].configure(text=name)
@@ -667,15 +745,19 @@ class App(ctk.CTk):
         extra = sum(len(g.files) - 1 for g in dups)
         reclaim = sum(g.size * (len(g.files) - 1) for g in dups)
         counts = {"Sort": len(moves), "Duplicates": extra, "Large & Old": len(large), "Empty Folders": len(empty)}
-        texts = {
-            "Sort": f"{plural(len(moves), 'file')} to sort",
-            "Duplicates": f"{plural(extra, 'duplicate')}, {core.human_size(reclaim)} reclaimable",
-            "Large & Old": f"{plural(len(large), 'large or old file')}",
-            "Empty Folders": f"{plural(len(empty), 'empty folder')}",
+        def word(n: int, w: str) -> str:
+            return w if n == 1 else w + "s"
+
+        captions = {
+            "Sort": f"{word(len(moves), 'file')} to sort",
+            "Duplicates": f"{word(extra, 'duplicate')} · {core.human_size(reclaim)} reclaimable",
+            "Large & Old": f"large or old {word(len(large), 'file')}",
+            "Empty Folders": f"empty {word(len(empty), 'folder')}",
         }
-        for i, (name, card) in enumerate(self.cards.items()):
-            card.configure(text=texts[name] + ("\nNothing to clean. Nice." if not counts[name] else "\nClick to review"))
+        for i, (name, (card, num, cap)) in enumerate(self.cards.items()):
+            cap.configure(text=captions[name] + ("\nNothing to clean. Nice." if not counts[name] else "\nClick to review"))
             card.grid(row=5 + i // 2, column=i % 2, sticky="ew", padx=6, pady=6)  # rows 0-4: title … Scan button
+            count_up(num, counts[name])
             self.nav[name].configure(text=f"{name}  ({counts[name]})" if counts[name] else name)
         total = sum(counts.values())
         self.status.configure(text="Scan finished. Review the cards below." if total
@@ -799,11 +881,35 @@ class App(ctk.CTk):
         self._report("Done", f"Sent {plural(result[0], 'item')} to the Recycle Bin. Restore them from the Bin if needed.", result[1])
         self.scan()
 
-    @staticmethod
-    def _report(title: str, msg: str, errors: list[str]) -> None:
+    def _report(self, title: str, msg: str, errors: list[str]) -> None:
+        """Problems need reading, so they get a dialog; plain success is a toast that needs no click."""
         if errors:
             msg += f"\n\n{len(errors)} had problems:\n" + "\n".join(errors[:8])
-        messagebox.showinfo(title, msg)
+            return messagebox.showwarning(title, msg)
+        self.toast(msg)
+
+    def toast(self, text: str, ms: int = 4500) -> None:
+        """Slides up above the status bar, then slides away by itself."""
+        old = getattr(self, "_toast", None)
+        if old is not None and old.winfo_exists():
+            old.destroy()
+        t = self._toast = ctk.CTkFrame(self, corner_radius=T.R_BUTTON, fg_color=T.TEXT)
+        ctk.CTkLabel(t, text=text, font=(FONT, 14), text_color=T.BG, wraplength=460,
+                     justify="left").pack(padx=18, pady=12)
+        rest = -(48 + 16)  # just above the 48 px status bar
+
+        def slide(start: float, end: float, then=None, i: int = 1, steps: int = 10) -> None:
+            if not t.winfo_exists():
+                return
+            y = end if not ANIMATE else start + (end - start) * (1 - (1 - i / steps) ** 3)
+            t.place(relx=1.0, rely=1.0, x=-T.PAD_X, y=y, anchor="se")
+            if ANIMATE and i < steps:
+                self.after(18, slide, start, end, then, i + 1)
+            elif then:
+                then()
+
+        slide(rest + 36, rest)
+        self.after(ms, lambda: t.winfo_exists() and slide(rest, rest + 120, t.destroy))
 
 
 def main() -> None:

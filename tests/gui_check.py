@@ -129,7 +129,32 @@ assert len(app.large.rows) == 2
 # ---- layout: Home cards sit below the Scan button; an empty tab header takes no space
 app.show("Home")
 settle(300)
-assert all(c.winfo_rooty() >= app.scan_btn.winfo_rooty() + app.scan_btn.winfo_height() for c in app.cards.values())
+assert all(c.winfo_rooty() >= app.scan_btn.winfo_rooty() + app.scan_btn.winfo_height() for c, _, _ in app.cards.values())
+settle(800)  # count-up finished
+assert [n.cget("text") for _, n, _ in app.cards.values()] == ["2", "300", "2", "21"], \
+    [n.cget("text") for _, n, _ in app.cards.values()]
+assert float(app.attributes("-alpha")) == 1.0, "window must end fully opaque after the fade-in"
+
+# ---- motion and feedback: disabled primary looks disabled, toast comes and goes, shortcuts
+assert app.large.action_btn.cget("state") == "disabled" and app.large.action_btn.cget("fg_color") != A.T.ACCENT
+app.large.select_all(True)
+assert app.large.action_btn.cget("state") == "normal" and app.large.action_btn.cget("fg_color") == A.T.ACCENT
+app.large.select_all(False)
+app.toast("Moved 3 files.", ms=600)
+settle(300)
+assert app._toast.winfo_ismapped()
+shoot("toast")
+settle(1200)
+assert not app._toast.winfo_exists(), "toast must hide itself"
+app.focus_force()
+app.event_generate("<Control-Key-2>")
+settle(100)
+assert app.current == "Sort", app.current
+app.show("Duplicates")
+app.event_generate("<Control-f>")
+settle(100)
+assert app.focus_get() is not None and str(app.focus_get()).startswith(str(app.dups.search))
+print("motion + shortcuts OK")
 app.show("Duplicates")
 settle(300)
 assert app.dups.head.winfo_height() <= 2, app.dups.head.winfo_height()

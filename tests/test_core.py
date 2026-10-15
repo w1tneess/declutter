@@ -1,0 +1,335 @@
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import pytest
+
+from declutter import core
+
+
+@pytest.fixture(autouse=True)
+def isolated_log(tmp_path, monkeypatch):
+    log_dir = tmp_path / "_log"
+    monkeypatch.setattr(core, "LOG_DIR", log_dir)
+    monkeypatch.setattr(core, "UNDO_LOG", log_dir / "undo.json")
+
+
+@pytest.fixture
+def root(tmp_path):
+    r = tmp_path / "messy"
+    r.mkdir()
+    return r
+
+
+def touch(p: Path, data: bytes = b"x", age_days: float = 0) -> Path:
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(data)
+    if age_days:
+        t = time.time() - age_days * 86400
+        os.utime(p, (t, t))
+    return p
+
+
+def hide(p: Path) -> None:
+    if sys.platform != "win32":
+        pytest.skip("hidden attribute is Windows-only")
+    subprocess.run(["attrib", "+h", str(p)], check=True)
+
+
+# ---------- refused locations ----------
+
+def test_refuses_drive_root():
+    ok, _ = core.check_root(Path(Path.home().anchor))
+    assert not ok
+
+
+def test_refuses_home_itself(root, monkeypatch):
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: root))
+    assert not core.check_root(root)[0]
+    sub = root / "Downloads"
+    sub.mkdir()
+    assert core.check_root(sub)[0]
+
+
+@pytest.mark.parametrize("name", ["Windows", "Program Files", "ProgramData", "AppData", ".git", "node_modules"])
+def test_refuses_protected_names(root, name):
+    d = root / name / "inner"
+    d.mkdir(parents=True)
+    assert not core.check_root(d)[0]
+    with pytest.raises(ValueError):
+        core.plan_sort(d)
+
+
+def test_refuses_missing_folder(root):
+    assert not core.check_root(root / "nope")[0]
+
+
+# ---------- sort ----------
+
+def test_sort_plan_categories(root):
+    for n in ["a.JPG", "b.pdf", "c.mp4", "d.mp3", "e.zip", "f.exe", "g.py", "h.xyz"]:
+        touch(root / n)
+    cats = {m.src.name: m.category for m in core.plan_sort(root)}
+    assert cats == {"a.JPG": "Images", "b.pdf": "Documents", "c.mp4": "Videos", "d.mp3": "Audio",
+                    "e.zip": "Archives", "f.exe": "Installers", "g.py": "Code", "h.xyz": "Other"}
+
+
+def test_sort_top_level_only_by_default(root):
+    touch(root / "a.txt")
+    touch(root / "sub" / "b.txt")
+    assert [m.src.name for m in core.plan_sort(root)] == ["a.txt"]
+    assert sorted(m.src.name for m in core.plan_sort(root, recursive=True)) == ["a.txt", "b.txt"]
+
+
+def test_sort_collisions_within_batch_and_on_disk(root):
+    touch(root / "Documents" / "a.txt", b"old")  # already on disk
+    touch(root / "a.txt", b"1")
+    touch(root / "s1" / "a.txt", b"2")
+    touch(root / "s2" / "a.txt", b"3")
+    moves = core.plan_sort(root, recursive=True)
+    names = sorted(m.dst.name for m in moves)
+    assert names == ["a (1).txt", "a (2).txt", "a (3).txt"]
+    assert len({str(m.dst).lower() for m in moves}) == 3
+
+
+def test_sort_skips_hidden_and_symlinks(root):
+    touch(root / ".secret.txt")
+    h = touch(root / "hidden.txt")
+    hide(h)
+    touch(root / "ok.txt")
+    assert [m.src.name for m in core.plan_sort(root)] == ["ok.txt"]
+    assert [m.src.name for m in core.plan_sort(root, recursive=True)] == ["ok.txt"]
+
+
+def test_sort_skips_symlink(root):
+    target = touch(root.parent / "outside.txt")
+    try:
+        os.symlink(target, root / "link.txt")
+    except OSError:
+        pytest.skip("symlinks not permitted")
+    assert core.plan_sort(root) == []
+
+
+def test_apply_and_undo_round_trip(root):
+    touch(root / "a.txt", b"A")
+    touch(root / "b.jpg", b"B")
+    moves = core.plan_sort(root)
+    n, errs = core.apply_moves(moves)
+    assert (n, errs) == (2, [])
+    assert (root / "Documents" / "a.txt").read_bytes() == b"A"
+    assert not (root / "a.txt").exists()
+    assert core.can_undo()
+
+    restored, errs = core.undo_last()
+    assert (restored, errs) == (2, [])
+    assert (root / "a.txt").read_bytes() == b"A"
+    assert (root / "b.jpg").read_bytes() == b"B"
+    assert not (root / "Documents").exists()  # emptied category folder removed
+    assert not core.can_undo()
+
+
+def test_undo_reports_missing_file(root):
+    touch(root / "a.txt")
+    core.apply_moves(core.plan_sort(root))
+    (root / "Documents" / "a.txt").unlink()
+    restored, errs = core.undo_last()
+    assert restored == 0 and len(errs) == 1
+
+
+def test_undo_with_nothing_logged():
+    assert core.undo_last() == (0, ["Nothing to undo."])
+
+
+# ---------- duplicates ----------
+
+def test_duplicates_same_content_different_names(root):
+    old = touch(root / "old.bin", b"same", age_days=10)
+    new = touch(root / "sub" / "copy.bin", b"same", age_days=1)
+    groups = core.find_duplicates(root)
+    assert len(groups) == 1
+    assert groups[0].files == [old, new]  # oldest first = suggested keeper
+
+
+def test_same_size_different_content_not_duplicates(root):
+    touch(root / "a.bin", b"aaaa")
+    touch(root / "b.bin", b"bbbb")
+    assert core.find_duplicates(root) == []
+
+
+def test_empty_files_ignored(root):
+    touch(root / "a", b"")
+    touch(root / "b", b"")
+    assert core.find_duplicates(root) == []
+
+
+def test_dup_selection_never_all_copies(root):
+    a = touch(root / "a.bin", b"same", age_days=5)
+    b = touch(root / "b.bin", b"same")
+    groups = core.find_duplicates(root)
+    core.check_dup_selection(groups, {b})
+    with pytest.raises(ValueError):
+        core.check_dup_selection(groups, {a, b})
+
+
+# ---------- large and old ----------
+
+def test_large_old_filters(root):
+    mb = 1024 * 1024
+    touch(root / "big_new.bin", b"0" * (2 * mb), age_days=1)
+    touch(root / "big_old.bin", b"0" * (2 * mb), age_days=100)
+    touch(root / "small_old.bin", b"0", age_days=100)
+
+    def names(**kw):
+        return [f.path.name for f in core.find_large_old(root, **kw)]
+
+    assert names(min_mb=1, older_days=30) == ["big_old.bin"]  # both must match
+    assert sorted(names(min_mb=1, older_days=0)) == ["big_new.bin", "big_old.bin"]
+    assert sorted(names(min_mb=0, older_days=30)) == ["big_old.bin", "small_old.bin"]
+    assert len(names(min_mb=0, older_days=0)) == 3
+
+
+def test_large_old_sorted_largest_first(root):
+    touch(root / "m.bin", b"0" * 200)
+    touch(root / "l.bin", b"0" * 900)
+    touch(root / "s.bin", b"0" * 10)
+    assert [f.path.name for f in core.find_large_old(root, min_mb=0)] == ["l.bin", "m.bin", "s.bin"]
+
+
+# ---------- empty folders ----------
+
+def test_empty_dirs_nested_deepest_first(root):
+    (root / "a" / "b" / "c").mkdir(parents=True)
+    touch(root / "full" / "keep.txt")
+    (root / "full" / "empty").mkdir()
+    (root / "has_file_deep" / "x").mkdir(parents=True)
+    touch(root / "has_file_deep" / "x" / "f.txt")
+    found = core.find_empty_dirs(root)
+    assert set(found) == {root / "a", root / "a" / "b", root / "a" / "b" / "c", root / "full" / "empty"}
+    assert found.index(root / "a" / "b" / "c") < found.index(root / "a" / "b") < found.index(root / "a")
+    assert root not in found
+
+
+def test_empty_dirs_hidden_and_protected_not_listed(root):
+    (root / "node_modules").mkdir()
+    (root / ".cache").mkdir()
+    (root / "plain").mkdir()
+    assert core.find_empty_dirs(root) == [root / "plain"]
+
+
+def test_dir_with_only_hidden_file_not_empty(root):
+    touch(root / "d" / ".keep")
+    assert core.find_empty_dirs(root) == []
+
+
+# ---------- recycle bin ----------
+
+def test_to_recycle_bin_calls_send2trash(root, monkeypatch):
+    sent = []
+    monkeypatch.setattr(core, "send2trash", sent.append)
+    f = touch(root / "a.txt")
+    ok, errs = core.to_recycle_bin([f, root / "missing.txt"])
+    assert ok == 1 and errs == []
+    assert sent == [os.path.abspath(f)]
+
+
+# ---------- hardening ----------
+
+def test_refuses_parent_of_home(root, monkeypatch):
+    home = root / "profile"
+    home.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    assert not core.check_root(root)[0]
+
+
+def test_junction_not_followed(root):
+    if sys.platform != "win32":
+        pytest.skip("junctions are Windows-only")
+    target = root.parent / "elsewhere"
+    touch(target / "secret.txt")
+    link = root / "link"
+    r = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True)
+    if r.returncode:
+        pytest.skip("cannot create junction")
+    touch(root / "a.txt")
+    assert [m.src.name for m in core.plan_sort(root, recursive=True)] == ["a.txt"]
+    assert core.find_empty_dirs(root) == []
+
+
+def test_shared_entries_match_separate_walks(root):
+    touch(root / "a.bin", b"same", age_days=3)
+    touch(root / "s" / "b.bin", b"same")
+    entries = core.scan_entries(root)
+    assert [m.src for m in core.plan_sort(root, True, entries=entries)] == \
+           [m.src for m in core.plan_sort(root, True)]
+    assert len(core.find_duplicates(root, entries=entries)) == 1
+
+
+def test_big_duplicates_use_full_hash(root):
+    head = b"h" * (70 * 1024)  # identical first 64 KB, different tail
+    touch(root / "a.bin", head + b"A" * 100)
+    touch(root / "b.bin", head + b"B" * 100)
+    touch(root / "c.bin", head + b"A" * 100)
+    groups = core.find_duplicates(root)
+    assert len(groups) == 1 and {p.name for p in groups[0].files} == {"a.bin", "c.bin"}
+
+
+def test_apply_moves_refuses_outside_root(root, tmp_path):
+    outside = touch(tmp_path / "outside.txt")
+    mv = core.Move(outside, root / "Documents" / "outside.txt")
+    n, errs = core.apply_moves([mv], root)
+    assert n == 0 and len(errs) == 1 and outside.exists()
+
+
+def test_apply_moves_skips_vanished_file(root):
+    mv = core.Move(root / "gone.txt", root / "Documents" / "gone.txt")
+    n, errs = core.apply_moves([mv], root)
+    assert n == 0 and len(errs) == 1
+
+
+def test_recycle_refuses_outside_root(root, tmp_path, monkeypatch):
+    sent = []
+    monkeypatch.setattr(core, "send2trash", sent.append)
+    outside = touch(tmp_path / "outside.txt")
+    inside = touch(root / "in.txt")
+    ok, errs = core.to_recycle_bin([outside, inside, root], root)
+    assert ok == 1 and len(errs) == 2 and sent == [os.path.abspath(inside)]
+
+
+def test_trash_empty_dirs_rechecks(root, monkeypatch):
+    sent = []
+    monkeypatch.setattr(core, "send2trash", sent.append)
+    (root / "still_empty").mkdir()
+    (root / "got_a_file").mkdir()
+    found = core.find_empty_dirs(root)
+    touch(root / "got_a_file" / "new.txt")  # arrives after the scan
+    ok, errs = core.trash_empty_dirs(found, root)
+    assert ok == 1 and len(errs) == 1 and sent == [os.path.abspath(root / "still_empty")]
+
+
+def test_trash_duplicates_needs_a_keeper(root, monkeypatch):
+    sent = []
+    monkeypatch.setattr(core, "send2trash", sent.append)
+    a = touch(root / "a.bin", b"same", age_days=5)
+    b = touch(root / "b.bin", b"same")
+    group = core.find_duplicates(root)[0]
+    a.unlink()  # the kept copy disappears after the scan
+    ok, errs = core.trash_duplicates([(group, [b])], root)
+    assert ok == 0 and len(errs) == 1 and sent == []
+
+
+def test_undo_rejects_protected_paths_and_damaged_log(root):
+    import json
+    core.LOG_DIR.mkdir(parents=True, exist_ok=True)
+    victim = touch(root / "x.txt")
+    batch = [{"moves": [{"src": r"C:\Windows\x.txt", "dst": str(victim)}, {"bad": 1}]}]
+    core.UNDO_LOG.write_text(json.dumps(batch), encoding="utf-8")
+    restored, errs = core.undo_last()
+    assert restored == 0 and len(errs) == 2 and victim.exists()
+
+
+def test_log_write_is_atomic_file_replace(root):
+    touch(root / "a.txt")
+    core.apply_moves(core.plan_sort(root), root)
+    assert core.UNDO_LOG.exists() and not core.UNDO_LOG.with_suffix(".tmp").exists()

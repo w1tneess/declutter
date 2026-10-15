@@ -33,17 +33,27 @@ MODES = ("System", "Light", "Dark")
 _SETTINGS = core.LOG_DIR / "settings.json"
 
 
-def load_mode() -> str:
+def load_settings() -> dict:
     try:
-        mode = json.loads(_SETTINGS.read_text(encoding="utf-8")).get("theme")
-    except (OSError, ValueError, AttributeError):
-        return "System"
+        data = json.loads(_SETTINGS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_settings(**changes) -> None:
+    """Merge changes into the settings file, keeping keys not mentioned."""
+    try:
+        _SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+        _SETTINGS.write_text(json.dumps({**load_settings(), **changes}), encoding="utf-8")
+    except OSError:
+        pass  # the choice just isn't remembered; never worth an error dialog
+
+
+def load_mode() -> str:
+    mode = load_settings().get("theme")
     return mode if mode in MODES else "System"
 
 
 def save_mode(mode: str) -> None:
-    try:
-        _SETTINGS.parent.mkdir(parents=True, exist_ok=True)
-        _SETTINGS.write_text(json.dumps({"theme": mode}), encoding="utf-8")
-    except OSError:
-        pass  # the choice just isn't remembered; never worth an error dialog
+    save_settings(theme=mode)

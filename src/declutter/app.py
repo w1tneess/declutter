@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import queue
+import subprocess
 import threading
 from collections import Counter
 from pathlib import Path
@@ -22,9 +23,11 @@ MAX_ROWS = {"Duplicates": 100, "Large & Old": 200, "Empty Folders": 300}
 NAMES = ("Home", "Sort", "Duplicates", "Large & Old", "Empty Folders")
 HELP = {
     "Sort": "Moves loose files into folders by type (Images, Documents, …). Nothing is deleted.",
-    "Duplicates": "Files with identical content. The oldest copy is kept; pick a different one if you prefer.",
-    "Large & Old": "Big or long-untouched files. Nothing is selected for you, so tick what you want gone.",
-    "Empty Folders": "Folders with no files inside, however deep.",
+    "Duplicates": "Files with identical content. The oldest copy is kept; pick a different one if you prefer. "
+                  "Double-click a file to see it in Explorer.",
+    "Large & Old": "Big or long-untouched files. Nothing is selected for you, so tick what you want gone. "
+                   "Double-click a file to see it in Explorer.",
+    "Empty Folders": "Folders with no files inside, however deep. Double-click one to see it in Explorer.",
 }
 _KNOWN = {  # Windows Known Folder IDs, so OneDrive-redirected folders resolve correctly
     "Downloads": "{374DE290-123F-4565-9164-39C4925E467B}",
@@ -60,6 +63,12 @@ def known_folder(name: str) -> Path:
     except Exception:
         pass
     return Path.home() / name
+
+
+def reveal(p: Path) -> None:
+    """Show the item selected in Explorer. Never opens it: that could run an installer."""
+    if p.exists():
+        subprocess.Popen(f'explorer /select,"{p}"')
 
 
 def confirm(master, title: str, message: str, ok_text: str) -> bool:
@@ -99,21 +108,37 @@ def confirm(master, title: str, message: str, ok_text: str) -> bool:
 
 
 class Tab(ctk.CTkFrame):
-    """Title, optional header row, scrollable checkbox list, and a footer with one action."""
+    """Title, optional header row, scrollable checkbox list, and a footer with one action.
+
+    With a filter typed, only matching rows are shown, and only shown rows count as selected,
+    so an action never touches something the user can't see.
+    """
 
     def __init__(self, master, title: str, action: str, on_action: Callable[[], None],
-                 size_of: Callable[[object], int] | None = None, subtitle: str = ""):
+                 size_of: Callable[[object], int] | None = None, subtitle: str = "", search: bool = True):
         super().__init__(master, fg_color="transparent")
         self.size_of = size_of
         self.locked = False  # True while a background job runs
         self.items: list[tuple[ctk.BooleanVar, object]] = []
+        self.rows: list[tuple[ctk.CTkBaseClass, str, dict]] = []  # (widget, lowercase text, pack options)
+        self._q = ""
+        self._filter_job = None
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.grid(row=0, sticky="ew")
-        ctk.CTkLabel(top, text=title, font=(FONT, T.TITLE, "bold"), text_color=T.TEXT).pack(anchor="w")
+        top.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(top, text=title, font=(FONT, T.TITLE, "bold"), text_color=T.TEXT).grid(row=0, column=0, sticky="w")
         ctk.CTkLabel(top, text=subtitle, font=(FONT, 14), text_color=T.TEXT_MUTED,
-                     wraplength=640, justify="left").pack(anchor="w", pady=(2, 0))
+                     wraplength=640, justify="left").grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 0))
+        self.search = None
+        if search:
+            self.search = ctk.CTkEntry(top, placeholder_text="Filter by name", width=220, height=34, font=(FONT, 14),
+                                       corner_radius=T.R_BUTTON, fg_color=T.SURFACE, text_color=T.TEXT,
+                                       border_color=T.BORDER_CONTROL, placeholder_text_color=T.TEXT_MUTED)
+            self.search.grid(row=0, column=1, sticky="e")
+            self.search.bind("<KeyRelease>", lambda _e: self._filter_soon())
+            self.search.bind("<Escape>", lambda _e: (self.search.delete(0, "end"), self._filter_soon()))
         self.head = ctk.CTkFrame(self, fg_color="transparent")
         self.head.grid(row=1, sticky="ew", pady=T.CARD_GAP // 2)
         self.list = ctk.CTkScrollableFrame(self, corner_radius=T.R_CARD, fg_color=T.SURFACE)
@@ -143,6 +168,31 @@ class Tab(ctk.CTkFrame):
         for w in self.list.winfo_children():
             w.destroy()
         self.items = []
+        self.rows = []
+
+    def _add_row(self, widget, text: str, **pack) -> None:
+        self.rows.append((widget, text.lower(), pack))
+        if self._q in text.lower():
+            widget.pack(**pack)
+
+    def _shown(self) -> list[bool]:
+        return [self._q in t for _, t, _ in self.rows]
+
+    def _filter_soon(self) -> None:
+        """Debounced, so typing fast doesn't repack hundreds of rows per keystroke."""
+        if self._filter_job:
+            self.after_cancel(self._filter_job)
+        self._filter_job = self.after(150, self._apply_filter)
+
+    def _apply_filter(self) -> None:
+        self._filter_job = None
+        self._q = self.search.get().strip().lower() if self.search else ""
+        for w, _, _ in self.rows:
+            w.pack_forget()
+        for w, t, pack in self.rows:
+            if self._q in t:
+                w.pack(**pack)
+        self.update_selection()
 
     def _build_chunked(self, rows: list, make: Callable[[object], None], chunk: int = 12) -> None:
         """Create widgets a few at a time so the window keeps repainting and stays responsive."""
@@ -171,26 +221,31 @@ class Tab(ctk.CTkFrame):
             text, obj = row
             v = ctk.BooleanVar(value=checked)
             self.items.append((v, obj))
-            ctk.CTkCheckBox(self.list, text=text, variable=v, font=(FONT, 15), text_color=T.TEXT,
-                            fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
-                            checkmark_color=T.ON_ACCENT,
-                            command=self.update_selection).pack(anchor="w", padx=12, pady=6)
+            cb = ctk.CTkCheckBox(self.list, text=text, variable=v, font=(FONT, 15), text_color=T.TEXT,
+                                 fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
+                                 checkmark_color=T.ON_ACCENT, command=self.update_selection)
+            if isinstance(obj, Path):
+                cb.bind("<Double-Button-1>", lambda _e, p=obj: reveal(p))
+            self._add_row(cb, text, anchor="w", padx=12, pady=6)
 
         self._build_chunked(rows, make)
 
     def select_all(self, on: bool) -> None:
-        for v, _ in self.items:
-            v.set(on)
+        for (v, _), shown in zip(self.items, self._shown()):
+            if shown:
+                v.set(on)
         self.update_selection()
 
     def selected(self) -> list:
-        return [o for v, o in self.items if v.get()]
+        return [o for (v, o), shown in zip(self.items, self._shown()) if shown and v.get()]
 
     def update_selection(self) -> None:
         sel = self.selected()
         text = f"Selected: {plural(len(sel), 'item')}"
         if self.size_of and sel:
             text += f", {core.human_size(sum(self.size_of(o) for o in sel))}"
+        if self._q:
+            text += f"  ·  {sum(self._shown())} of {len(self.rows)} shown"
         self.sel_label.configure(text=text)
         self.action_btn.configure(state="normal" if sel and not self.locked else "disabled")
 
@@ -218,7 +273,6 @@ class DupTab(Tab):
 
         def make(g: core.DupGroup) -> None:
             box = ctk.CTkFrame(self.list, corner_radius=T.R_BUTTON, fg_color=T.SURFACE_ALT)
-            box.pack(fill="x", padx=6, pady=6)
             inc, keeper = ctk.BooleanVar(value=True), ctk.IntVar(value=0)
             self.groups.append((inc, keeper, g))
             ctk.CTkCheckBox(box, text=f"{g.files[0].name} · {len(g.files)} copies · "
@@ -231,20 +285,26 @@ class DupTab(Tab):
                     shown = str(f.relative_to(base))
                 except ValueError:
                     shown = str(f)
-                ctk.CTkRadioButton(box, text=("Keep   " if i == 0 else "") + shown, value=i, variable=keeper,
-                                   font=(FONT, 13), text_color=T.TEXT_MUTED, fg_color=T.ACCENT,
-                                   hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
-                                   command=self.update_selection).pack(anchor="w", padx=28, pady=3)
+                rb = ctk.CTkRadioButton(box, text=("Keep   " if i == 0 else "") + shown, value=i, variable=keeper,
+                                        font=(FONT, 13), text_color=T.TEXT_MUTED, fg_color=T.ACCENT,
+                                        hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
+                                        command=self.update_selection)
+                rb.bind("<Double-Button-1>", lambda _e, p=f: reveal(p))
+                rb.pack(anchor="w", padx=28, pady=3)
+            self._add_row(box, " ".join(f.name for f in g.files), fill="x", padx=6, pady=6)
 
         self._build_chunked(groups[:cap], make, chunk=4)
 
+    def visible_groups(self) -> list[tuple[ctk.BooleanVar, ctk.IntVar, core.DupGroup]]:
+        return [grp for grp, shown in zip(self.groups, self._shown()) if shown]
+
     def select_all(self, on: bool) -> None:
-        for inc, _, _ in self.groups:
+        for inc, _, _ in self.visible_groups():
             inc.set(on)
         self.update_selection()
 
     def selected(self) -> list[Path]:
-        return [f for inc, keep, g in self.groups if inc.get()
+        return [f for inc, keep, g in self.visible_groups() if inc.get()
                 for i, f in enumerate(g.files) if i != keep.get()]
 
 
@@ -264,13 +324,17 @@ class App(ctk.CTk):
         self._busy = False
         self.sizes: dict[Path, int] = {}  # filled by the scan, so ticking boxes never touches the disk
         self.cat_sizes: dict[str, int] = {}
+        # The last scan's file list, so filter changes don't walk the folder again. Actions still
+        # re-check the disk, and every action rescans afterwards.
+        self.entries: list[core.Entry] | None = None
+        self.settings = T.load_settings()
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self._build_sidebar()
         self.pages: dict[str, ctk.CTkFrame] = {"Home": self._build_home()}
         self.sort = Tab(self, "Sort by type", "Move files", self.move, size_of=self._category_size,
-                        subtitle=HELP["Sort"])
+                        subtitle=HELP["Sort"], search=False)
         self._build_sort_header()
         self.dups = DupTab(self, self.remove_dups, size_of=self._size)
         self.large = Tab(self, "Large & old files", "Send to Recycle Bin",
@@ -282,12 +346,16 @@ class App(ctk.CTk):
                          subtitle=HELP["Empty Folders"])
         self.tabs = (self.sort, self.dups, self.large, self.empty)
         self.pages.update({"Sort": self.sort, "Duplicates": self.dups,
-                           "Large & Old": self.large, "Empty Folders": self.empty})
+                           "Large & Old": self.large, "Empty Folders": self.empty,
+                           "Settings": self._build_settings()})
         self._build_statusbar()
         self._refresh_undo()
         self.show("Home")
         self.report_callback_exception = self._on_ui_error
         self.after(100, self._poll)
+        last = self.settings.get("last_folder")
+        if self.settings.get("reopen") and last and core.check_root(last)[0]:
+            self.set_folder(Path(last))
 
     def _on_ui_error(self, exc_type, exc, tb) -> None:
         """Last line of defence: a bug in a callback shows a dialog instead of freezing the app."""
@@ -303,20 +371,62 @@ class App(ctk.CTk):
         ctk.CTkLabel(bar, text="Declutter", font=(FONT, 20, "bold"), text_color=T.TEXT).pack(
             anchor="w", padx=20, pady=(T.PAD_Y, T.GAP))
         self.nav = {}
-        for name in NAMES:
+        for name in NAMES + ("Settings",):
             b = ctk.CTkButton(bar, text=name, anchor="w", font=(FONT, 15), height=40, fg_color="transparent",
                               text_color=T.TEXT_NAV, hover_color=T.SURFACE_ALT,
                               corner_radius=T.R_NAV, command=lambda n=name: self.show(n))
-            b.pack(fill="x", padx=12, pady=2)
+            if name == "Settings":  # macOS-style: settings sit apart, at the bottom
+                b.pack(side="bottom", fill="x", padx=12, pady=(0, 16))
+            else:
+                b.pack(fill="x", padx=12, pady=2)
             self.nav[name] = b
-        ctk.CTkLabel(bar, text="Appearance", font=(FONT, 13), text_color=T.TEXT_MUTED).pack(
-            side="bottom", anchor="w", padx=20, pady=(0, 20))
+
+    def _build_settings(self) -> ctk.CTkFrame:
+        """Grouped rows in the style of macOS System Settings. Every change saves immediately."""
+        f = ctk.CTkFrame(self, fg_color="transparent")
+        ctk.CTkLabel(f, text="Settings", font=(FONT, T.TITLE, "bold"), text_color=T.TEXT).pack(anchor="w")
+
+        def group(title: str) -> ctk.CTkFrame:
+            ctk.CTkLabel(f, text=title.upper(), font=(FONT, 12), text_color=T.TEXT_MUTED).pack(
+                anchor="w", padx=12, pady=(T.GAP, 6))
+            card = ctk.CTkFrame(f, corner_radius=T.R_CARD, fg_color=T.SURFACE)
+            card.pack(fill="x")
+            return card
+
+        def row(card, label: str, note: str = "") -> ctk.CTkFrame:
+            r = ctk.CTkFrame(card, fg_color="transparent")
+            r.pack(fill="x", padx=16, pady=10)
+            text = ctk.CTkFrame(r, fg_color="transparent")
+            text.pack(side="left")
+            ctk.CTkLabel(text, text=label, font=(FONT, 15), text_color=T.TEXT).pack(anchor="w")
+            if note:
+                ctk.CTkLabel(text, text=note, font=(FONT, 13), text_color=T.TEXT_MUTED).pack(anchor="w")
+            return r
+
+        card = group("Appearance")
         self.theme_pick = ctk.CTkSegmentedButton(
-            bar, values=list(T.MODES), command=self._set_theme, font=(FONT, 13), fg_color=T.SURFACE_ALT,
-            selected_color=T.ACCENT, selected_hover_color=T.ACCENT_HOVER, unselected_color=T.SURFACE_ALT,
+            row(card, "Theme", "System follows your Windows setting."), values=list(T.MODES),
+            command=self._set_theme, font=(FONT, 13), fg_color=T.SURFACE_ALT, selected_color=T.ACCENT,
+            selected_hover_color=T.ACCENT_HOVER, unselected_color=T.SURFACE_ALT,
             unselected_hover_color=T.BORDER, text_color=T.TEXT_NAV)
         self.theme_pick.set(T.load_mode())
-        self.theme_pick.pack(side="bottom", fill="x", padx=12, pady=(0, 6))
+        self.theme_pick.pack(side="right")
+
+        card = group("Start-up")
+        self.reopen = ctk.BooleanVar(value=bool(self.settings.get("reopen")))
+        ctk.CTkSwitch(row(card, "Reopen the last folder", "Picks it again at start. It is not scanned until you press Scan."),
+                      text="", variable=self.reopen, progress_color=T.ACCENT, fg_color=T.BORDER_CONTROL,
+                      command=lambda: T.save_settings(reopen=self.reopen.get())).pack(side="right")
+
+        card = group("Large & old files")
+        for label, var in (("Bigger than (MB)", self.min_mb), ("Older than (days)", self.older)):
+            e = ctk.CTkEntry(row(card, label, "0 turns this filter off. Remembered between sessions."),
+                             textvariable=var, width=80, fg_color=T.SURFACE, text_color=T.TEXT,
+                             border_color=T.BORDER_CONTROL, corner_radius=T.R_BUTTON)
+            e.pack(side="right")
+            e.bind("<FocusOut>", lambda _e: self._save_filters())
+            e.bind("<Return>", lambda _e: self._save_filters())
+        return f
 
     def _set_theme(self, mode: str) -> None:
         ctk.set_appearance_mode(mode.lower())
@@ -399,12 +509,15 @@ class App(ctk.CTk):
         self.undo_btn.pack(side="right")
 
     def _build_large_header(self) -> None:
-        self.min_mb, self.older = ctk.StringVar(value="100"), ctk.StringVar(value="0")
+        self.min_mb = ctk.StringVar(value=str(self.settings.get("min_mb", "100")))
+        self.older = ctk.StringVar(value=str(self.settings.get("older_days", "0")))
         for label, var in (("Bigger than (MB)", self.min_mb), ("Older than (days)", self.older)):
             ctk.CTkLabel(self.large.head, text=label, font=(FONT, 14), text_color=T.TEXT).pack(
                 side="left", padx=(0, 6))
-            ctk.CTkEntry(self.large.head, textvariable=var, width=70, fg_color=T.SURFACE, text_color=T.TEXT,
-                         border_color=T.BORDER_CONTROL, corner_radius=T.R_BUTTON).pack(side="left", padx=(0, 16))
+            e = ctk.CTkEntry(self.large.head, textvariable=var, width=70, fg_color=T.SURFACE, text_color=T.TEXT,
+                             border_color=T.BORDER_CONTROL, corner_radius=T.R_BUTTON)
+            e.pack(side="left", padx=(0, 16))
+            e.bind("<Return>", lambda _e: self.refilter())
         ctk.CTkLabel(self.large.head, text="0 turns a filter off", font=(FONT, 13),
                      text_color=T.TEXT_MUTED).pack(side="left")
         ctk.CTkButton(self.large.head, text="Apply", width=80, height=38, corner_radius=T.R_BUTTON,
@@ -426,6 +539,8 @@ class App(ctk.CTk):
             return
         # core returns paths under the resolved folder, so keep the same form to make relative paths work
         self.folder = p.resolve()
+        self.entries = None
+        T.save_settings(last_folder=str(self.folder))
         self.folder_label.configure(text=f"Folder: {self.folder}")
         self.scan_btn.configure(state="normal")
         for c in self.cards.values():
@@ -489,10 +604,19 @@ class App(ctk.CTk):
             mb, days = float(self.min_mb.get() or 0), int(float(self.older.get() or 0))
             if mb < 0 or days < 0:
                 raise ValueError
-            return mb, days
         except ValueError:
             messagebox.showwarning("Check the filters", "Size and age must be numbers, 0 or more.")
             return None
+        T.save_settings(min_mb=self.min_mb.get(), older_days=self.older.get())
+        return mb, days
+
+    def _save_filters(self) -> None:
+        """Settings page: remember valid values quietly; invalid ones are reported when used."""
+        try:
+            if float(self.min_mb.get() or 0) >= 0 and float(self.older.get() or 0) >= 0:
+                T.save_settings(min_mb=self.min_mb.get(), older_days=self.older.get())
+        except ValueError:
+            pass
 
     def scan(self) -> None:
         params = self._large_params()
@@ -507,13 +631,13 @@ class App(ctk.CTk):
             dups = core.find_duplicates(folder, progress=p, cancel=c, entries=entries)
             large = core.find_large_old(folder, *params, cancel=c, entries=entries)
             p("Looking for empty folders…")
-            return moves, dups, large, core.find_empty_dirs(folder, cancel=c)
+            return entries, moves, dups, large, core.find_empty_dirs(folder, cancel=c)
 
         self.status.configure(text="Scanning…")
         self._run(work, self._scan_done)
 
     def _scan_done(self, r) -> None:
-        moves, dups, large, empty = r
+        self.entries, moves, dups, large, empty = r
         self.sizes = {}
         self._fill_sort(moves)
         self._fill_dups(dups)
@@ -582,8 +706,8 @@ class App(ctk.CTk):
     def resort(self) -> None:
         if not self.folder:
             return
-        folder, rec, c = self.folder, self.recursive.get(), self._cancel.is_set
-        self._run(lambda: core.plan_sort(folder, rec, cancel=c, entries=core.scan_entries(folder, c)),
+        folder, rec, c, entries = self.folder, self.recursive.get(), self._cancel.is_set, self.entries
+        self._run(lambda: core.plan_sort(folder, rec, cancel=c, entries=entries or core.scan_entries(folder, c)),
                   self._fill_sort)
 
     def move(self) -> None:
@@ -619,12 +743,12 @@ class App(ctk.CTk):
         params = self._large_params()
         if not self.folder or not params:
             return
-        folder, c = self.folder, self._cancel.is_set
-        self._run(lambda: core.find_large_old(folder, *params, cancel=c), self._fill_large)
+        folder, c, entries = self.folder, self._cancel.is_set, self.entries
+        self._run(lambda: core.find_large_old(folder, *params, cancel=c, entries=entries), self._fill_large)
 
     def remove_dups(self) -> None:
         removals = [(g, [f for i, f in enumerate(g.files) if i != keep.get()])
-                    for inc, keep, g in self.dups.groups if inc.get()]
+                    for inc, keep, g in self.dups.visible_groups() if inc.get()]
         try:  # safety rule 6; the radio buttons already make this impossible
             core.check_dup_selection([g for _, _, g in self.dups.groups],
                                      {f for _, rem in removals for f in rem})

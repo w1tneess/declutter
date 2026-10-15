@@ -4,8 +4,12 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
-## Download
-Get `Declutter-Setup.exe` (installs for your account, no admin rights) or the portable `.zip` from [Releases](../../releases/latest). Website: https://w1tneess.github.io/declutter/ (source in `site/`, published by `.github/workflows/pages.yml`).
+## Install
+1. Download `Declutter-Setup.exe` from the [latest release](https://github.com/w1tneess/declutter/releases/latest). Prefer no installer? Take `Declutter-portable.zip`, unzip it anywhere and run `Declutter.exe`.
+2. Run the installer. It installs for your account only, so no admin rights are needed.
+3. The app is not code-signed yet, so Windows SmartScreen may say "Windows protected your PC" (Unknown publisher). Click **More info**, then **Run anyway**.
+
+Uninstall from Windows Settings > Apps. Website: https://w1tneess.github.io/declutter/ (source in `site/`, published by `.github/workflows/pages.yml`).
 
 ## What it does
 - **Sort by type**: moves loose files into Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Undo supported.

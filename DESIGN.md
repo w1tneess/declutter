@@ -52,4 +52,6 @@ Button hierarchy (HIG): one filled accent button per view (Scan on Home, the foo
 
 Settings page: grouped cards in the style of macOS System Settings (Appearance, Start-up, Large & old files); every change saves at once. The page scrolls, so it still fits at 150% scaling in the minimum window. If the 1100 x 720 design size does not fit the screen (for example 1080p at 150%), the window opens maximised.
 
+Motion (only where it explains a change, all skipped when Windows "Animation effects" is off): window and confirm dialog fade in (~180 ms); Home card numbers count up after a scan (ease-out, ~450 ms); success results are a toast that slides up above the status bar and leaves after ~4.5 s, while results with problems still use a dialog. Disabled filled buttons turn grey (`surface_alt` fill, muted text) so they never read as clickable. Shortcuts: Ctrl+F filter, Ctrl+1–6 pages.
+
 Accent is `#0071E3`, not system blue `#007AFF`: white on `#007AFF` is about 4:1, below 4.5:1 for normal text. Muted text is `#6E6E73` / `#98989D` rather than Apple's translucent secondaryLabel for the same reason. Contrast figures are from published values, not measured in-app.

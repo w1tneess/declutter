@@ -4,6 +4,9 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
+## Download
+Get `Declutter-Setup.exe` (installs for your account, no admin rights) or the portable `.zip` from [Releases](../../releases/latest). Website: https://w1tneess.github.io/declutter/ (source in `site/`, published by `.github/workflows/pages.yml`).
+
 ## What it does
 - **Sort by type**: moves loose files into Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Undo supported.
 - **Duplicates**: finds identical files (size, then SHA-256). Keeps the oldest copy unless you choose another.
@@ -13,8 +16,8 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 - **Double-click** a file or folder to see it in Explorer (it is never opened).
 - **Settings**: theme (System, Light, Dark), reopen the last folder at start, and the Large & old filters, all remembered.
 
-![Duplicates, light theme](docs/screenshot-duplicates.png)
-![Large & old files, dark theme](docs/screenshot-dark.png)
+![Duplicates, light theme](site/screenshot-duplicates.png)
+![Large & old files, dark theme](site/screenshot-dark.png)
 
 Removals go to the Recycle Bin. Drive roots, your home folder, Windows, Program Files, AppData, `.git` and `node_modules` are refused. Symlinks, junctions and hidden files are skipped.
 

@@ -23,8 +23,8 @@ jobs:
       - name: Build app (PyInstaller onedir)
         run: >
           python -m PyInstaller --noconfirm --clean --onedir --windowed --name Declutter
-          --icon assets\icon.ico --paths src --collect-data customtkinter
-          --specpath build --workpath build\pyi --distpath dist launcher.py
+          --icon "${{ github.workspace }}\assets\icon.ico" --paths "${{ github.workspace }}\src"
+          --collect-data customtkinter --specpath build --workpath build\pyi --distpath dist launcher.py
 
       - name: Portable zip
         run: Compress-Archive -Path dist\Declutter -DestinationPath dist\Declutter-portable.zip -Force

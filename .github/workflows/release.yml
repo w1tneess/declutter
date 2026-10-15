@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+      - name: Build app (PyInstaller onedir)
+        run: >
+          python -m PyInstaller --noconfirm --clean --onedir --windowed --name Declutter
+          --icon assets\icon.ico --paths src --collect-data customtkinter
+          --specpath build --workpath build\pyi --distpath dist launcher.py
+
+      - name: Portable zip
+        run: Compress-Archive -Path dist\Declutter -DestinationPath dist\Declutter-portable.zip -Force
+
+      - name: Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          & $iscc "/DAppVersion=$version" installer\declutter.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$env:GITHUB_REF_NAME" dist\Declutter-Setup.exe dist\Declutter-portable.zip
+          --title "Declutter $env:GITHUB_REF_NAME" --generate-notes

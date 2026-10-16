@@ -357,17 +357,6 @@ def test_is_pinned(root):
     assert not core.is_pinned(root / "c.txt", [])
 
 
-# ---------- old installers ----------
-
-def test_old_installers_filter(root):
-    touch(root / "setup.exe", b"0", age_days=60)
-    touch(root / "tool.MSI", b"0", age_days=45)
-    touch(root / "new.exe", b"0", age_days=2)
-    touch(root / "old.pdf", b"0", age_days=90)
-    found = core.find_large_old(root, min_mb=0, older_days=30, exts=core.CATEGORIES["Installers"])
-    assert sorted(f.path.name for f in found) == ["setup.exe", "tool.MSI"]
-
-
 # ---------- undo count ----------
 
 def test_undo_count_matches_last_batch(root):

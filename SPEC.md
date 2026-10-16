@@ -13,7 +13,7 @@ A modern, easy-to-use Windows desktop app that declutters a messy folder safely.
 5. Skip symlinks, hidden files and hidden folders.
 6. A duplicate group may never have all its copies selected.
 7. Never claim a feature works without testing it (see Testing).
-8. Leave alone: active downloads (`.crdownload`, `.part`, `.tmp`, `.download`, `.opdownload`, `.!qB`), files modified in the last 5 minutes, and OneDrive online-only placeholders (never hashed or moved).
+8. Leave alone: active downloads (`.crdownload`, `.part`, `.tmp`, `.download`, `.opdownload`, `.!qB`; a `.crdownload` or `.part` untouched for 3 days counts as dead and is offered only in "Likely leftovers"), files modified in the last 5 minutes, and OneDrive online-only placeholders (never hashed or moved).
 9. Project folders (containing `.git`, `node_modules`, `.venv`, `package.json` or a `.sln` file) are never entered, sorted, counted as empty or removed.
 10. Removals only on local fixed drives; network and removable drives are refused (the Recycle Bin may not exist there).
 11. One failing item never aborts a batch; failures are collected and listed to the user.
@@ -21,9 +21,9 @@ A modern, easy-to-use Windows desktop app that declutters a messy folder safely.
 ## Features (v1)
 | Feature | Behaviour |
 |---|---|
-| Sort by type | Top-level loose files only (no recursion) go to Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Name collisions get ` (1)`. |
-| Duplicates | Group by size, then SHA-256. Oldest-modified copy is the suggested keeper. User can change the keeper per group. |
-| Large and old | Filters: min size (MB) and older than (days). Both must match; 0 disables a filter. Sorted by size, largest first. |
+| Sort by type | Top-level loose files only (no recursion) go to Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Name collisions get ` (1)`. Screenshots and chat pictures go to `Images/Screenshots` and `Images/Chat` (one level). `.lnk`, `.url`, `.ini` are never moved. Files last touched (later of modified and created time) within N hours, default 24, setting 0 to 72, are left alone. |
+| Duplicates | Group by size, then first + last 64 KB, then SHA-256. Oldest-modified copy is the suggested keeper. User can change the keeper per group. A separate, never-preselected "Possible re-downloads" section lists `name (1).ext` / `name - Copy.ext` siblings within 2 % size; the original always stays. |
+| Large and old | Filters: min size (MB) and older than (days). Both must match; 0 disables a filter. Sorted by size, largest first. A "Likely leftovers" group (never "safe", never preselected): zips fully extracted into a same-named sibling folder, installers over 7 days old in the Downloads known folder, `.crdownload` / `.part` over 3 days old. |
 | Empty folders | Folders with no files at any depth (`desktop.ini` and `Thumbs.db` don't count). Delete deepest first; the whole folder goes to the Recycle Bin. |
 
 Out of scope for v1: folder watching, custom rules, cloud drives, drag-and-drop, auto-update.

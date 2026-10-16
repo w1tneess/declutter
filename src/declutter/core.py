@@ -17,9 +17,12 @@ import ctypes
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import time
+import uuid
+import zipfile
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -46,7 +49,22 @@ PROTECTED_DIRS = {
 
 PROJECT_MARKERS = {".git", "node_modules", ".venv", "package.json"}  # plus any *.sln
 PARTIAL_EXTS = {".crdownload", ".part", ".tmp", ".download", ".opdownload", ".!qb"}
+DEAD_EXTS = {".crdownload", ".part"}  # these, once older than DEAD_SECS, are offered as dead downloads
+DEAD_SECS = 3 * 86400
+SKIP_SORT_EXTS = {".lnk", ".url", ".ini"}  # shortcuts and config files are never moved
 RECENT_SECS = 5 * 60
+RECENT_HOURS_DEFAULT, RECENT_HOURS_MAX = 24, 72
+INSTALLER_EXTS, INSTALLER_SECS = {".exe", ".msi", ".iso"}, 7 * 86400
+EXTRACTED, OLD_INSTALLER, DEAD_DOWNLOAD = "Already extracted", "Old installer", "Dead download"
+SUB_BUCKETS = {  # one level under Images; matched on the file name (without extension)
+    "Screenshots": re.compile(r"(screenshot|snip|capture)", re.I),
+    "Chat": re.compile(r"(IMG-\d{8}-WA\d+|WhatsApp Image)", re.I),
+}
+KNOWN_FOLDERS = {  # Windows Known Folder IDs, so OneDrive-redirected folders resolve correctly
+    "Downloads": "{374DE290-123F-4565-9164-39C4925E467B}",
+    "Desktop": "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
+    "Documents": "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}",
+}
 FOLDER_JUNK = {"desktop.ini", "thumbs.db"}  # Explorer's own files; a folder holding only these is empty
 
 LOG_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".config")) / "Declutter"
@@ -122,9 +140,57 @@ def is_project(lower_names: set[str]) -> bool:
 
 
 def _leave_alone(name: str, st: os.stat_result, now: float) -> bool:
-    """Active download, changed in the last few minutes, or an online-only cloud placeholder."""
-    return (os.path.splitext(name)[1].lower() in PARTIAL_EXTS or now - st.st_mtime < RECENT_SECS
-            or bool(_attrs(st) & _CLOUD_ONLY))
+    """Active download, changed in the last few minutes, or an online-only cloud placeholder.
+    A .crdownload / .part untouched for DEAD_SECS counts as dead, not active."""
+    ext = os.path.splitext(name)[1].lower()
+    active = ext in PARTIAL_EXTS and not (ext in DEAD_EXTS and now - st.st_mtime > DEAD_SECS)
+    return active or now - st.st_mtime < RECENT_SECS or bool(_attrs(st) & _CLOUD_ONLY)
+
+
+def last_touched(st) -> float:
+    """Later of modified and created time. Copying a file keeps its old modified time but gives it a new
+    creation time (st_birthtime on Python 3.12 Windows; st_ctime elsewhere)."""
+    try:
+        born = st.st_birthtime
+    except AttributeError:
+        born = st.st_ctime
+    return max(st.st_mtime, born)
+
+
+def recent_hours_setting(v, default: int = RECENT_HOURS_DEFAULT) -> int:
+    """The saved "leave recent files alone" hours, clamped to 0..72 (0 = off). Junk gives `default`."""
+    if isinstance(v, bool):
+        return default
+    try:
+        return max(0, min(RECENT_HOURS_MAX, int(float(v))))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _known_folder_path(folder_id: str) -> Path | None:
+    """SHGetKnownFolderPath for a KNOWN_FOLDERS id; None off Windows or on failure. Tests mock this."""
+    windll = getattr(ctypes, "windll", None)
+    if windll is None:
+        return None
+    try:
+        guid = (ctypes.c_byte * 16).from_buffer_copy(uuid.UUID(folder_id).bytes_le)
+        out = ctypes.c_wchar_p()
+        if windll.shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(out)) == 0:
+            path = Path(out.value)
+            windll.ole32.CoTaskMemFree(out)
+            return path
+    except Exception:
+        pass
+    return None
+
+
+def known_folder(name: str) -> Path:
+    """Real location of Downloads/Desktop/Documents (they can be moved); ~/<name> if the shell can't say."""
+    return _known_folder_path(KNOWN_FOLDERS[name]) or Path.home() / name
+
+
+def in_downloads(p: str | Path) -> bool:
+    return is_pinned(p, [known_folder("Downloads")])  # same "is p this folder or inside it" test
 
 
 def _drive_root(p: str | Path) -> str:
@@ -268,28 +334,55 @@ class Move:
 
     @property
     def category(self) -> str:
-        return self.dst.parent.name
+        """'Images', or 'Images/Screenshots' for a sub-bucket."""
+        return "/".join(_bucket(self.dst))
 
 
-def plan_sort(root: str | Path, cancel: CancelFn = None,
-              entries: list[Entry] | None = None) -> list[Move]:
-    """Loose files directly in root only; subfolders are never touched."""
+def _bucket(dst: Path) -> tuple[str, ...]:
+    parent, grand = dst.parent, dst.parent.parent
+    if grand.name == "Images" and parent.name in SUB_BUCKETS:
+        return grand.name, parent.name
+    return (parent.name,)
+
+
+class SortPlan(list):
+    """The moves, plus how many files were left alone for being touched within the grace period."""
+    recent_left = 0
+
+
+def _sub_bucket(cat: str, stem: str) -> str | None:
+    if cat == "Images":
+        return next((b for b, rx in SUB_BUCKETS.items() if rx.match(stem)), None)
+    return None
+
+
+def plan_sort(root: str | Path, cancel: CancelFn = None, entries: list[Entry] | None = None,
+              recent_hours: int = 0, now: float | None = None) -> SortPlan:
+    """Loose files directly in root only; subfolders are never touched. Shortcuts and config files
+    (.lnk .url .ini) stay. Files last touched within `recent_hours` (0 = off) are left alone and counted."""
     root = require_root(root)
     if entries is None:
         entries = list(walk_files(root, cancel=cancel))
-    moves: list[Move] = []
+    cutoff = (time.time() if now is None else now) - recent_hours * 3600
+    plan = SortPlan()
     taken: set[str] = set()  # destinations already planned in this batch
     for src, st in sorted(entries, key=lambda e: str(e[0])):
-        if src.parent != root:
+        ext = src.suffix.lower()
+        if src.parent != root or ext in SKIP_SORT_EXTS or ext in DEAD_EXTS:
             continue
-        cat = EXT_TO_CAT.get(src.suffix.lower(), "Other")
-        dst = unique_path(root / cat / src.name, taken)
+        if recent_hours and last_touched(st) > cutoff:
+            plan.recent_left += 1
+            continue
+        cat = EXT_TO_CAT.get(ext, "Other")
+        sub = _sub_bucket(cat, src.stem)
+        dst = unique_path(root / cat / sub / src.name if sub else root / cat / src.name, taken)
         taken.add(str(dst).lower())
-        moves.append(Move(src, dst, st.st_size))
-    return moves
+        plan.append(Move(src, dst, st.st_size))
+    return plan
 
 
-def apply_moves(moves: list[Move], root: str | Path | None = None) -> tuple[int, list[str]]:
+def apply_moves(moves: list[Move], root: str | Path | None = None,
+                recent_hours: int = 0, now: float | None = None) -> tuple[int, list[str]]:
     base = require_root(root) if root is not None else None
     done: list[Move] = []
     errors: list[str] = []
@@ -304,6 +397,9 @@ def apply_moves(moves: list[Move], root: str | Path | None = None) -> tuple[int,
                 continue
             if _leave_alone(m.src.name, st, time.time()):
                 errors.append(f"{m.src.name}: still downloading, just changed or online-only, skipped")
+                continue
+            if recent_hours and last_touched(st) > (time.time() if now is None else now) - recent_hours * 3600:
+                errors.append(f"{m.src.name}: touched in the last {recent_hours} hours, skipped")
                 continue
             m.dst.parent.mkdir(parents=True, exist_ok=True)
             final = unique_path(m.dst)
@@ -391,10 +487,11 @@ def undo_last() -> tuple[int, list[str]]:
                 src.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(dst), str(unique_path(src)))
                 restored += 1
-                try:
-                    dst.parent.rmdir()  # remove category folder if now empty
-                except OSError:
-                    pass
+                for d in (dst.parent, dst.parent.parent)[:len(_bucket(dst))]:
+                    try:
+                        d.rmdir()  # remove the category (and Images/Screenshots's Images) folder if now empty
+                    except OSError:
+                        break
         except Exception as e:
             errors.append(f"{dst.name}: {e}")
     _write_log(batches)
@@ -449,7 +546,7 @@ def find_duplicates(root: str | Path, min_size: int = 1, progress: ProgressFn = 
     mtime: dict[Path, float] = {}
     by_size: dict[int, list[Path]] = defaultdict(list)
     for p, st in entries:
-        if st.st_size >= min_size and not _attrs(st) & _CLOUD_ONLY:
+        if st.st_size >= min_size and not _attrs(st) & _CLOUD_ONLY and p.suffix.lower() not in DEAD_EXTS:
             by_size[st.st_size].append(p)
             mtime[p] = st.st_mtime
     sized = {s: fs for s, fs in by_size.items() if len(fs) > 1}
@@ -516,6 +613,59 @@ def trash_duplicates(removals: list[tuple[DupGroup, list[Path]]],
     return ok, errors
 
 
+@dataclass
+class Redownload:
+    original: Path
+    copy: Path
+    orig_size: int
+    copy_size: int
+    orig_mtime: float
+    copy_mtime: float
+
+
+_COPY_NAME = re.compile(r"(?P<base>.+?)(?: \(\d+\)| - Copy(?: \(\d+\))?)", re.I)
+
+
+def find_redownloads(root: str | Path, entries: list[Entry] | None = None, cancel: CancelFn = None,
+                     exclude=()) -> list[Redownload]:
+    """'name (1).ext' or 'name - Copy.ext' next to an existing 'name.ext' of the same type, size within 2 %.
+    Not identical-content copies: pass those (the duplicate groups' files) as `exclude`."""
+    root = require_root(root)
+    if entries is None:
+        entries = list(walk_files(root, cancel=cancel))
+    skip = set(exclude)
+    by_name = {(p.parent, p.suffix.lower(), p.stem.lower()): (p, st) for p, st in entries}
+    out: list[Redownload] = []
+    for p, st in entries:
+        m = _COPY_NAME.fullmatch(p.stem)
+        if not m or p in skip or not st.st_size:
+            continue
+        orig = by_name.get((p.parent, p.suffix.lower(), m["base"].lower()))
+        if orig and orig[1].st_size and abs(st.st_size - orig[1].st_size) <= 0.02 * orig[1].st_size:
+            out.append(Redownload(orig[0], p, orig[1].st_size, st.st_size, orig[1].st_mtime, st.st_mtime))
+    out.sort(key=lambda r: str(r.copy))
+    return out
+
+
+def trash_redownloads(pairs: list[Redownload], root: str | Path, removing=()) -> tuple[int, list[str]]:
+    """Recycle the chosen copies, but only where the original is on disk right now and is not itself
+    being removed (`removing` holds files other parts of the same job send away). At least one copy stays."""
+    base = require_root(root)
+    gone = {p.copy for p in pairs} | set(removing)
+    ok, errors = 0, []
+    for r in pairs:
+        try:
+            if r.original in gone or not r.original.is_file() or os.path.islink(r.original):
+                errors.append(f"{r.copy.name}: its original {r.original.name} is not staying, skipped")
+                continue
+            n, errs = to_recycle_bin([r.copy], base)
+            ok += n
+            errors += errs
+        except Exception as e:
+            errors.append(f"{r.copy.name}: {e}")
+    return ok, errors
+
+
 # ---------- 3. large and old files ----------
 
 @dataclass
@@ -530,18 +680,70 @@ class FileInfo:
 
 
 def find_large_old(root: str | Path, min_mb: float = 100, older_days: int = 0,
-                   cancel: CancelFn = None, entries: list[Entry] | None = None,
-                   exts: set[str] | None = None) -> list[FileInfo]:
-    """Files with size >= min_mb AND age >= older_days. A value of 0 disables that filter.
-    With `exts` (lowercase, e.g. CATEGORIES["Installers"]) only those file types are listed."""
+                   cancel: CancelFn = None, entries: list[Entry] | None = None) -> list[FileInfo]:
+    """Files with size >= min_mb AND age >= older_days. A value of 0 disables that filter."""
     root = require_root(root)
     if entries is None:
         entries = list(walk_files(root, cancel=cancel))
     cutoff = time.time() - older_days * 86400
     out = [FileInfo(p, st.st_size, st.st_mtime) for p, st in entries
            if not (min_mb and st.st_size < min_mb * 1024 * 1024)
-           and not (older_days and st.st_mtime > cutoff)
-           and (exts is None or p.suffix.lower() in exts)]
+           and not (older_days and st.st_mtime > cutoff) and p.suffix.lower() not in DEAD_EXTS]
+    out.sort(key=lambda x: x.size, reverse=True)
+    return out
+
+
+@dataclass
+class Leftover:
+    path: Path
+    size: int
+    mtime: float
+    reason: str
+
+
+def _is_extracted(zip_path: Path) -> bool:
+    """True if the folder named like the zip, right next to it, holds every file of the archive at its
+    stored size. A name match alone proves nothing, and the zip's parent folder is never searched."""
+    folder = zip_path.parent / zip_path.stem  # no such folder: the file checks below fail
+    try:
+        with zipfile.ZipFile(zip_path) as z:
+            files = [i for i in z.infolist() if not i.is_dir()]
+        if not files:
+            return False
+        base = os.path.normcase(os.path.abspath(folder))
+        for i in files:
+            target = os.path.abspath(folder / i.filename)
+            if not os.path.normcase(target).startswith(base + os.sep):
+                return False  # an entry such as ../x.txt points outside the folder
+            if os.path.islink(target) or not os.path.isfile(target) or os.path.getsize(target) != i.file_size:
+                return False
+    except (zipfile.BadZipFile, OSError, ValueError, NotImplementedError):
+        return False
+    return True
+
+
+def find_leftovers(root: str | Path, entries: list[Entry] | None = None, cancel: CancelFn = None,
+                   now: float | None = None) -> list[Leftover]:
+    """Files that are probably no longer needed (never "safe": the user reviews each, none is preselected):
+    zips already extracted next to themselves, installers (.exe .msi .iso) over 7 days old in the Downloads
+    folder, and .crdownload / .part files over 3 days old."""
+    root = require_root(root)
+    if entries is None:
+        entries = list(walk_files(root, cancel=cancel))
+    now = time.time() if now is None else now
+    out: list[Leftover] = []
+    for p, st in entries:
+        if cancel and cancel():
+            return []
+        ext, reason = p.suffix.lower(), None
+        if ext in DEAD_EXTS and now - st.st_mtime > DEAD_SECS:
+            reason = DEAD_DOWNLOAD
+        elif ext in INSTALLER_EXTS and now - st.st_mtime > INSTALLER_SECS and in_downloads(p):
+            reason = OLD_INSTALLER
+        elif ext == ".zip" and _is_extracted(p):
+            reason = EXTRACTED
+        if reason:
+            out.append(Leftover(p, st.st_size, st.st_mtime, reason))
     out.sort(key=lambda x: x.size, reverse=True)
     return out
 

@@ -10,6 +10,7 @@ import shutil
 import sys
 import tempfile
 import time
+import zipfile
 from pathlib import Path
 
 repo = Path(__file__).resolve().parent.parent
@@ -50,18 +51,42 @@ for i in range(2):
     (big / f"huge{i}.bin").write_bytes(b"z" * (2_000_000 + i))
 for i in range(20):
     (big / "empties" / f"e{i}").mkdir(parents=True)
-(big / "folder000" / "old_setup.exe").write_bytes(b"MZ installer")  # for the "Old installers" pill
 old = time.time() - 3600  # files changed in the last 5 minutes are skipped as in use
 files = [f for f in big.rglob("*") if f.is_file()]
 for f in files:
     os.utime(f, (old, old))
-os.utime(big / "folder000" / "old_setup.exe", (old - 60 * 86400, old - 60 * 86400))
+
+# ---- small folder for leftovers, re-downloads, sub-buckets and the grace period (scanned near the end)
+small = base / "small"
+
+
+def put(rel, data=b"x", days=10):
+    p = small / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(data)
+    t = time.time() - days * 86400
+    os.utime(p, (t, t))
+    return p
+
+
+put("Downloads/setup.exe", b"MZ", days=10)
+put("Downloads/dead.crdownload", b"half", days=5)
+with zipfile.ZipFile(small / "pack.zip", "w") as z:
+    z.writestr("a.txt", b"hello")
+put("pack/a.txt", b"hello")
+os.utime(small / "pack.zip", (old, old))
+put("docs/report.pdf", b"x" * 1000)
+put("docs/report (1).pdf", b"y" * 1005)
+for n in ("Screenshot 1.png", "WhatsApp Image 1.jpg", "photo.png", "a.lnk"):
+    put(n, n.encode())  # different bytes, so they are not exact duplicates of each other
 n_files = len(files)
 print(f"made {n_files} files in {time.time() - t0:.1f}s")
 assert n_files >= 10_000
 
 app = A.App()
 app.geometry("1100x720+40+40")
+app.recent_text.set("0")  # the 24 h default would hold back files this script just created
+app._set_recent()
 app.update()
 
 worst = 0.0
@@ -201,15 +226,6 @@ assert not app.undo_bar.winfo_manager() and (big / "huge0.bin").exists()
 A.confirm = real_confirm
 print("sort + undo banner OK")
 
-# ---- Large & old: the "Old installers" pill lists installers untouched for 30+ days, any size
-app._toggle_installers()
-pump(lambda: not app._busy)
-assert [p.name for _, p in app.large.items] == ["old_setup.exe"], [p.name for _, p in app.large.items]
-app._toggle_installers()
-pump(lambda: not app._busy)
-assert len(app.large.items) == 2
-print("old installers pill OK")
-
 # ---- pins: a pinned folder disappears from every list, and is back after unpinning
 app._set_pins([str(big / "folder000")])
 pump(lambda: not app._busy and app.entries is not None)
@@ -221,6 +237,7 @@ print("pins OK")
 
 # ---- keyboard: Tab focus shows a ring, Space activates, and a focused row scrolls into view
 app.show("Home")
+app.focus_force()  # focus events only fire while this window has the OS focus
 settle(200)
 app.scan_btn.focus_set()
 settle(100)
@@ -300,6 +317,55 @@ for mode in ("Light", "Dark"):
                                    .event_generate("<Escape>")))
     assert app._confirm_bin(3) is False and tops
 print("dialog OK")
+
+# ---- leftovers, re-downloads, sub-buckets, grace period on the small folder (Downloads is mocked to its subfolder)
+A.core._known_folder_path = lambda folder_id: small / "Downloads"
+sent, asked = [], []
+A.core.send2trash = sent.append
+A.confirm = lambda *a: asked.append(a) or True
+worst = 0.0
+app.set_folder(small)
+app.scan()
+pump(lambda: not app._busy and app.entries is not None)
+names = lambda tab: sorted(o.name for _, o in tab.items if o is not None)  # noqa: E731
+assert names(app.large) == ["dead.crdownload", "pack.zip", "setup.exe"], names(app.large)
+assert not any(v.get() for v, _ in app.large.items), "leftovers must start unticked"
+assert app.large.rows[0][0].cget("text").startswith("Likely leftovers (3)"), app.large.rows[0][0].cget("text")
+assert {m.category for m in app.moves} == {"Images/Screenshots", "Images/Chat", "Images", "Archives"}, \
+    {m.category for m in app.moves}
+assert "a.lnk" not in {m.src.name for m in app.moves}
+assert [c[1].copy.name for c in app.dups.copies] == ["report (1).pdf"] and not app.dups.copies[0][0].get()
+assert app.dups.selected() == [], app.dups.selected()
+assert "possible re-download" in app.cards["Duplicates"][2].cget("text"), app.cards["Duplicates"][2].cget("text")
+app._toggle_leftovers()
+assert names(app.large) == ["dead.crdownload", "pack.zip", "setup.exe"]
+app._toggle_leftovers()
+app.show("Large & Old")
+settle(300)
+shoot("leftovers")
+app.show("Duplicates")
+settle(300)
+shoot("redownloads")
+app.dups.select_all(True)
+assert app.dups.selected() == [], "Select all must not tick possible re-downloads"
+app.dups.copies[0][0].set(True)
+app.dups.update_selection()
+app.remove_dups()
+pump(lambda: not app._busy)
+assert asked[-1][3] == "Send 1 item" and sent == [os.path.abspath(small / "docs" / "report (1).pdf")], (asked[-1], sent)
+app.show("Large & Old")
+app.scan()
+pump(lambda: not app._busy and app.entries is not None)
+app.large.select_all(True)
+app.large.action_btn.invoke()
+pump(lambda: not app._busy)
+assert asked[-1][3] == "Send 3 items" and len(sent) == 4, (asked[-1], sent)
+app.recent_text.set("24")  # everything here was created a moment ago
+app._set_recent()
+pump(lambda: not app._busy)
+assert "recent files left alone" in app.sort_hint.cget("text"), app.sort_hint.cget("text")
+assert app.sort.files == [] and app.settings is not None and A.T.load_settings()["recent_hours"] == 24
+print(f"leftovers + re-downloads + sub-buckets + grace period OK, longest UI update {worst * 1000:.0f} ms")
 app._set_theme("System")
 app.destroy()
 

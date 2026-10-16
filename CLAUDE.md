@@ -16,3 +16,5 @@ Windows desktop app that declutters a messy folder safely. Full spec: `SPEC.md` 
 - Never permanently delete; use the Recycle Bin. Re-check the disk right before every action.
 - Tests must never touch real user folders.
 - Smallest change that solves the problem. Don't invent library APIs; check the docs.
+- Plan and backlog: see ROADMAP.md. Do not put status, test counts or PR numbers in this file.
+- Develop and test on Python 3.12, the version CI and the release build use.

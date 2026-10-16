@@ -20,6 +20,12 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest -q
 
+      - name: Stamp version from the tag (shown in Settings > About)
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          Set-Content src\declutter\__init__.py "__version__ = `"$version`""
+
       - name: Build app (PyInstaller onedir)
         run: >
           python -m PyInstaller --noconfirm --clean --onedir --windowed --name Declutter

@@ -23,8 +23,9 @@ ON_ACCENT = ("#FFFFFF", "#FFFFFF")
 ACCENT_TEXT = ("#0066CC", "#2997FF")
 ACCENT_SOFT = ("#E3EEFC", "#1A2F4A")
 ACCENT_HOVER = ("#0077ED", "#0077ED")
+FOCUS = TEXT  # keyboard focus ring: the highest-contrast colour in both themes, also on accent fills
 
-R_CARD, R_BUTTON, R_NAV, R_DIALOG = 16, 10, 8, 14
+R_CARD, R_BUTTON, R_NAV, R_DIALOG, R_PILL = 16, 10, 8, 14, 18
 TITLE = 32
 SIDEBAR_W = 232
 PAD_X, PAD_Y, GAP, CARD_GAP = 40, 32, 20, 16

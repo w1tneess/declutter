@@ -313,3 +313,46 @@ def test_log_write_is_atomic_file_replace(root):
     touch(root / "a.txt")
     core.apply_moves(core.plan_sort(root), root)
     assert core.UNDO_LOG.exists() and not core.UNDO_LOG.with_suffix(".tmp").exists()
+
+
+# ---------- pins (never touch) ----------
+
+def test_pinned_file_and_folder_are_skipped(root):
+    touch(root / "keep.bin", b"same", age_days=3)
+    touch(root / "copy.bin", b"same")
+    touch(root / "pinned_dir" / "inside.txt")
+    (root / "pinned_dir" / "empty").mkdir()
+    (root / "outer" / "pinned_empty").mkdir(parents=True)
+    pins = [str(root / "KEEP.bin"), root / "pinned_dir", root / "outer" / "pinned_empty"]  # case-insensitive
+    assert sorted(p.name for p, _ in core.scan_entries(root, ignore=pins)) == ["copy.bin"]
+    assert core.find_empty_dirs(root, ignore=pins) == []  # "outer" holds a pin, so it is not empty either
+    assert core.find_duplicates(root, entries=core.scan_entries(root, ignore=pins)) == []
+
+
+def test_is_pinned(root):
+    pins = [root / "a", root / "b.txt"]
+    assert core.is_pinned(root / "a" / "deep" / "x.txt", pins)
+    assert core.is_pinned(root / "B.TXT", pins)
+    assert not core.is_pinned(root / "ab.txt", pins)
+    assert not core.is_pinned(root / "c.txt", [])
+
+
+# ---------- old installers ----------
+
+def test_old_installers_filter(root):
+    touch(root / "setup.exe", b"0", age_days=60)
+    touch(root / "tool.MSI", b"0", age_days=45)
+    touch(root / "new.exe", b"0", age_days=2)
+    touch(root / "old.pdf", b"0", age_days=90)
+    found = core.find_large_old(root, min_mb=0, older_days=30, exts=core.CATEGORIES["Installers"])
+    assert sorted(f.path.name for f in found) == ["setup.exe", "tool.MSI"]
+
+
+# ---------- undo count ----------
+
+def test_undo_count_matches_last_batch(root):
+    assert core.undo_count() == 0
+    touch(root / "a.txt")
+    touch(root / "b.jpg")
+    core.apply_moves(core.plan_sort(root), root)
+    assert core.undo_count() == 2

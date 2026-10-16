@@ -158,8 +158,19 @@ def _inside(p: Path, root: Path) -> bool:
         return False
 
 
+def _pin_keys(pins) -> frozenset[str]:
+    return frozenset(os.path.normcase(os.path.abspath(p)) for p in pins)
+
+
+def is_pinned(p: str | Path, pins) -> bool:
+    """True if p is a pinned ("never touch") file or folder, or lies inside one."""
+    keys = _pin_keys(pins)
+    p = os.path.normcase(os.path.abspath(p))
+    return any(p == k or p.startswith(k.rstrip("\\/") + os.sep) for k in keys)
+
+
 def walk_files(root: Path, skip_dirs: set[str] | None = None,
-               cancel: CancelFn = None) -> Iterator[Entry]:
+               cancel: CancelFn = None, ignore=()) -> Iterator[Entry]:
     """Yield (path, stat) for regular files under root, in one pass.
 
     Skips symlinks, junctions, hidden, protected and project folders, and files to leave alone
@@ -167,6 +178,7 @@ def walk_files(root: Path, skip_dirs: set[str] | None = None,
     listing, so no extra syscalls are needed by callers.
     """
     skip = {d.lower() for d in (skip_dirs or ())}
+    pins = _pin_keys(ignore)
     stack = [os.fspath(root)]
     now = time.time()
     while stack:
@@ -186,7 +198,7 @@ def walk_files(root: Path, skip_dirs: set[str] | None = None,
                 st = e.stat(follow_symlinks=False)
             except OSError:
                 continue
-            if e.name.startswith(".") or _attrs(st) & _HIDDEN:
+            if e.name.startswith(".") or _attrs(st) & _HIDDEN or os.path.normcase(e.path) in pins:
                 continue
             if stat.S_ISDIR(st.st_mode):
                 low = e.name.lower()
@@ -197,9 +209,10 @@ def walk_files(root: Path, skip_dirs: set[str] | None = None,
                 yield Path(e.path), st
 
 
-def scan_entries(root: str | Path, cancel: CancelFn = None) -> list[Entry]:
-    """One walk of the folder; pass the result to plan_sort / find_duplicates / find_large_old."""
-    return list(walk_files(require_root(root), cancel=cancel))
+def scan_entries(root: str | Path, cancel: CancelFn = None, ignore=()) -> list[Entry]:
+    """One walk of the folder; pass the result to plan_sort / find_duplicates / find_large_old.
+    `ignore` holds pinned files and folders, which are skipped."""
+    return list(walk_files(require_root(root), cancel=cancel, ignore=ignore))
 
 
 def iter_files(root: Path, skip_dirs: set[str] | None = None,
@@ -343,6 +356,12 @@ def _read_log() -> list[dict]:
 
 def can_undo() -> bool:
     return bool(_read_log())
+
+
+def undo_count() -> int:
+    """Number of moves in the batch "Undo last sort" would reverse."""
+    batches = _read_log()
+    return len(batches[-1].get("moves", [])) if batches and isinstance(batches[-1], dict) else 0
 
 
 def _log_path_ok(p: Path) -> bool:
@@ -507,30 +526,34 @@ class FileInfo:
 
 
 def find_large_old(root: str | Path, min_mb: float = 100, older_days: int = 0,
-                   cancel: CancelFn = None, entries: list[Entry] | None = None) -> list[FileInfo]:
-    """Files with size >= min_mb AND age >= older_days. A value of 0 disables that filter."""
+                   cancel: CancelFn = None, entries: list[Entry] | None = None,
+                   exts: set[str] | None = None) -> list[FileInfo]:
+    """Files with size >= min_mb AND age >= older_days. A value of 0 disables that filter.
+    With `exts` (lowercase, e.g. CATEGORIES["Installers"]) only those file types are listed."""
     root = require_root(root)
     if entries is None:
         entries = list(walk_files(root, cancel=cancel))
     cutoff = time.time() - older_days * 86400
     out = [FileInfo(p, st.st_size, st.st_mtime) for p, st in entries
            if not (min_mb and st.st_size < min_mb * 1024 * 1024)
-           and not (older_days and st.st_mtime > cutoff)]
+           and not (older_days and st.st_mtime > cutoff)
+           and (exts is None or p.suffix.lower() in exts)]
     out.sort(key=lambda x: x.size, reverse=True)
     return out
 
 
 # ---------- 4. empty folders ----------
 
-def find_empty_dirs(root: str | Path, cancel: CancelFn = None) -> list[Path]:
+def find_empty_dirs(root: str | Path, cancel: CancelFn = None, ignore=()) -> list[Path]:
     """Folders containing no files, directly or in any subfolder. Root itself excluded.
     desktop.ini and Thumbs.db do not count as files.
 
-    Hidden, protected, linked and project folders are never reported and count as content,
+    Hidden, protected, linked, pinned and project folders are never reported and count as content,
     so their parents are never reported either.
     """
     root = require_root(root)
     root_s = os.fspath(root)
+    pins = _pin_keys(ignore)
     empty: list[Path] = []
 
     def visit(d: str) -> bool:
@@ -551,7 +574,7 @@ def find_empty_dirs(root: str | Path, cancel: CancelFn = None) -> list[Path]:
                     continue
                 plain_dir = (stat.S_ISDIR(st.st_mode) and not e.is_symlink() and not _is_link_dir(st)
                              and not e.name.startswith(".") and not _attrs(st) & _HIDDEN
-                             and e.name.lower() not in PROTECTED_DIRS)
+                             and e.name.lower() not in PROTECTED_DIRS and os.path.normcase(e.path) not in pins)
             except OSError:
                 plain_dir = False
             if not plain_dir or not visit(e.path):

@@ -1,25 +1,30 @@
 """Declutter GUI (CustomTkinter). All file logic lives in core.py."""
 from __future__ import annotations
 
+import gc
 import queue
 import subprocess
 import sys
 import threading
+import webbrowser
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Callable
 
 import customtkinter as ctk
 
-from . import core, theme as T
+from . import __version__, core, theme as T
 from .theme import FONT
+
+SITE = "https://w1tneess.github.io/declutter/"
+REPO = "https://github.com/w1tneess/declutter"
 
 GHOST = dict(fg_color="transparent", border_width=1, border_color=T.BORDER_CONTROL,
              text_color=T.TEXT_NAV, hover_color=T.SURFACE_ALT)
 PRIMARY = dict(fg_color=T.ACCENT, text_color=T.ON_ACCENT, hover_color=T.ACCENT_HOVER, text_color_disabled=T.TEXT_MUTED)
 PLAIN = dict(fg_color="transparent", text_color=T.ACCENT_TEXT, hover_color=T.SURFACE_ALT)  # HIG: low-emphasis actions are text-only
 # CustomTkinter widgets are slow to build, so long lists are capped to keep the window responsive.
-MAX_ROWS = {"Duplicates": 100, "Large & Old": 200, "Empty Folders": 300}
+MAX_ROWS = {"Sort": 300, "Duplicates": 100, "Large & Old": 200, "Empty Folders": 300}
 NAMES = ("Home", "Sort", "Duplicates", "Large & Old", "Empty Folders")
 NAV_LABEL = {"Sort": "Sort by type", "Large & Old": "Large & old", "Empty Folders": "Empty folders"}
 HELP = {
@@ -68,6 +73,60 @@ def known_folder(name: str) -> Path:
 def set_primary(btn, on: bool) -> None:
     """A disabled filled button must not stay bright blue, or it reads as clickable."""
     btn.configure(state="normal" if on else "disabled", fg_color=T.ACCENT if on else T.SURFACE_ALT)
+
+
+def keyboard_focus() -> None:
+    """CustomTkinter buttons, checkboxes, radios and switches can't be reached with Tab and never show
+    focus. Make them focusable (Space or Enter activates) with a ring visible in both themes. Runs once."""
+    if getattr(ctk.CTkButton, "_keyboard", False):
+        return
+
+    def border(w, on: bool) -> None:
+        if on:
+            w._unfocused = (w.cget("border_width"), w.cget("border_color"))
+            w.configure(border_width=2, border_color=T.FOCUS)
+        elif hasattr(w, "_unfocused"):
+            width, color = w._unfocused
+            w.configure(border_width=width, border_color=color)
+
+    def underline(w, on: bool) -> None:
+        f = w.cget("font")
+        if isinstance(f, tuple):
+            plain = tuple(x for x in f if x != "underline")
+            w.configure(font=plain + ("underline",) if on else plain)
+
+    def into_view(w) -> None:
+        """Tabbing through a long list must scroll the focused row into sight."""
+        sf = w.master
+        while sf is not None and not isinstance(sf, ctk.CTkScrollableFrame):
+            sf = sf.master
+        if sf is None:
+            return
+        canvas = sf._parent_canvas  # CTkScrollableFrame keeps its scrolling canvas here
+        total = sf.winfo_height()
+        y, h, view = w.winfo_rooty() - sf.winfo_rooty(), w.winfo_height(), canvas.winfo_height()
+        top = canvas.yview()[0] * total
+        if total > 0 and (y < top or y + h > top + view):
+            canvas.yview_moveto(max(0.0, y - view / 3) / total)
+
+    def wrap(cls, activate: str, ring) -> None:
+        orig = cls.__init__
+
+        def __init__(self, *args, **kwargs):
+            orig(self, *args, **kwargs)
+            t = getattr(self, "_text_label", None) or self._canvas  # what CTk's own focus_set() targets
+            t.configure(takefocus=1)
+            t.bind("<FocusIn>", lambda _e: (ring(self, True), into_view(self)), add="+")
+            t.bind("<FocusOut>", lambda _e: ring(self, False), add="+")
+            for key in ("<space>", "<Return>"):
+                t.bind(key, lambda _e: (getattr(self, activate)(), "break")[1], add="+")
+
+        cls.__init__ = __init__
+
+    for cls, activate, ring in ((ctk.CTkButton, "invoke", border), (ctk.CTkSwitch, "toggle", border),
+                                (ctk.CTkCheckBox, "toggle", underline), (ctk.CTkRadioButton, "invoke", underline)):
+        wrap(cls, activate, ring)
+    ctk.CTkButton._keyboard = True
 
 
 def animations_on() -> bool:
@@ -376,8 +435,74 @@ class DupTab(Tab):
                 for i, f in enumerate(g.files) if i != keep.get()]
 
 
+class SortTab(Tab):
+    """A box per type folder with a checkbox per file. The filter shows or hides whole boxes,
+    and everything in a shown box is visible, so only visible files can be selected."""
+
+    def __init__(self, master, on_action):
+        self.files: list[tuple[ctk.BooleanVar, core.Move, int]] = []  # (ticked, move, index of its box row)
+        super().__init__(master, "Sort by type", "Sort files", on_action, size_of=lambda m: m.size,
+                         subtitle=HELP["Sort"])
+
+    def _reset(self) -> None:
+        self.files = []
+        super()._reset()
+
+    def set_moves(self, moves: list[core.Move]) -> None:
+        if not moves:
+            return self.clear("Nothing to sort. Nice.")
+        self._reset()
+        cap = MAX_ROWS["Sort"]
+        if len(moves) > cap:
+            ctk.CTkLabel(self.list, text=f"Showing {cap} of {len(moves)} files. Sort these, then scan again for the rest.",
+                         font=(FONT, 13), text_color=T.TEXT_MUTED).pack(anchor="w", padx=12, pady=4)
+        by_cat: dict[str, list[core.Move]] = {}
+        for m in moves[:cap]:
+            by_cat.setdefault(m.category, []).append(m)
+        flat: list = []  # a category name opens a box; the moves after it fill that box
+        for cat in sorted(by_cat):
+            flat += [cat] + by_cat[cat]
+        box: dict[str, ctk.CTkFrame] = {}
+
+        def make(item) -> None:
+            if isinstance(item, str):
+                ms = by_cat[item]
+                b = box["now"] = ctk.CTkFrame(self.list, corner_radius=T.R_BUTTON, fg_color=T.SURFACE_ALT)
+                ctk.CTkLabel(b, text=f"{item} · {plural(len(ms), 'file')} · {core.human_size(sum(m.size for m in ms))}",
+                             font=(FONT, 15, "bold"), text_color=T.TEXT).pack(anchor="w", padx=12, pady=(8, 2))
+                self._add_row(b, " ".join([item] + [m.src.name for m in ms]), fill="x", padx=6, pady=6)
+                return
+            v = ctk.BooleanVar(value=True)
+            self.files.append((v, item, len(self.rows) - 1))
+            cb = ctk.CTkCheckBox(box["now"], text=item.src.name, variable=v, font=(FONT, 14), text_color=T.TEXT,
+                                 fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
+                                 checkmark_color=T.ON_ACCENT, command=self.update_selection)
+            cb.bind("<Double-Button-1>", lambda _e, p=item.src: reveal(p))
+            cb.pack(anchor="w", padx=28, pady=(3, 6))
+
+        self._build_chunked(flat, make)
+
+    def _visible(self) -> list[tuple[ctk.BooleanVar, core.Move]]:
+        shown = self._shown()
+        return [(v, m) for v, m, i in self.files if shown[i]]
+
+    def select_all(self, on: bool) -> None:
+        for v, _ in self._visible():
+            v.set(on)
+        self.update_selection()
+
+    def selected(self) -> list[core.Move]:
+        return [m for v, m in self._visible() if v.get()]
+
+    def update_selection(self) -> None:
+        super().update_selection()
+        n = len(self.selected())
+        self.action_btn.configure(text=f"Sort {plural(n, 'file')}" if n else "Sort files")
+
+
 class App(ctk.CTk):
     def __init__(self) -> None:
+        keyboard_focus()
         super().__init__()
         ctk.set_appearance_mode(T.load_mode().lower())  # "system" follows the Windows theme
         self.title("Declutter")
@@ -391,18 +516,18 @@ class App(ctk.CTk):
         self._cancel = threading.Event()
         self._busy = False
         self.sizes: dict[Path, int] = {}  # filled by the scan, so ticking boxes never touches the disk
-        self.cat_sizes: dict[str, int] = {}
         # The last scan's file list, so filter changes don't walk the folder again. Actions still
         # re-check the disk, and every action rescans afterwards.
         self.entries: list[core.Entry] | None = None
         self.settings = T.load_settings()
+        pins = self.settings.get("pins")  # "never touch" files and folders; the file is user-editable
+        self.pins: list[str] = [p for p in pins if isinstance(p, str)] if isinstance(pins, list) else []
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self._build_sidebar()
         self.pages: dict[str, ctk.CTkFrame] = {"Home": self._build_home()}
-        self.sort = Tab(self, "Sort by type", "Move files", self.move, size_of=self._category_size,
-                        subtitle=HELP["Sort"], search=False)
+        self.sort = SortTab(self, self.move)
         self._build_sort_header()
         self.dups = DupTab(self, self.remove_dups, size_of=self._size)
         self.large = Tab(self, "Large & old files", "Send to Recycle Bin",
@@ -507,7 +632,51 @@ class App(ctk.CTk):
             e.pack(side="right")
             e.bind("<FocusOut>", lambda _e: self._save_filters())
             e.bind("<Return>", lambda _e: self._save_filters())
+
+        pin_card = group("Never touch")
+
+        def fill_pins() -> None:
+            for w in pin_card.winfo_children():
+                w.destroy()
+            r = row(pin_card, "Pinned files and folders", "Skipped by every scan. Never moved or sent to the Bin.")
+            for text, ask in (("Add file…", filedialog.askopenfilename), ("Add folder…", filedialog.askdirectory)):
+                ctk.CTkButton(r, text=text, width=110, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
+                              command=lambda a=ask: self._add_pin(a(title="Never touch this")), **GHOST
+                              ).pack(side="right", padx=(8, 0))
+            for p in self.pins:
+                line = ctk.CTkFrame(pin_card, fg_color="transparent")
+                line.pack(fill="x", padx=16, pady=(0, 6))
+                ctk.CTkLabel(line, text=p, font=(FONT, 13.5), text_color=T.TEXT, anchor="w",
+                             wraplength=520, justify="left").pack(side="left")
+                ctk.CTkButton(line, text="Remove", width=80, height=30, corner_radius=T.R_BUTTON, font=(FONT, 13),
+                              command=lambda q=p: self._set_pins([x for x in self.pins if x != q]), **PLAIN
+                              ).pack(side="right")
+
+        self._fill_pins = fill_pins
+        fill_pins()
+
+        card = group("About")
+        r = row(card, f"Declutter {__version__}", "Free and open source (MIT). Your files never leave this computer.")
+        for text, url in (("Source code", REPO), ("Website", SITE)):
+            ctk.CTkButton(r, text=text, width=100, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
+                          command=lambda u=url: webbrowser.open(u), **PLAIN).pack(side="right", padx=(8, 0))
         return f
+
+    def _add_pin(self, picked: str) -> None:
+        if not picked:
+            return  # dialog cancelled
+        p = str(Path(picked).resolve())
+        if not core.is_pinned(p, self.pins):
+            self._set_pins(self.pins + [p])
+
+    def _set_pins(self, pins: list[str]) -> None:
+        self.pins = pins
+        T.save_settings(pins=pins)
+        self._fill_pins()
+        if self.entries is not None and not self._busy:
+            self.scan()  # refresh results so pinned items disappear from the lists
+        elif self.entries is not None:
+            self.status.configure(text="Pins saved. Scan again to update the lists.")
 
     def _set_theme(self, mode: str) -> None:
         ctk.set_appearance_mode(mode.lower())
@@ -596,11 +765,16 @@ class App(ctk.CTk):
         return f
 
     def _build_sort_header(self) -> None:
-        ctk.CTkLabel(self.sort.head, text="Only loose files directly in this folder are sorted.", font=(FONT, 13.5),
-                     text_color=T.TEXT_MUTED).pack(side="left")
-        self.undo_btn = ctk.CTkButton(self.sort.head, text="Undo last sort", corner_radius=T.R_BUTTON, height=38,
+        self.sort_hint = ctk.CTkLabel(self.sort.head, text="Only loose files directly in this folder are sorted.",
+                                      font=(FONT, 13.5), text_color=T.TEXT_MUTED)
+        self.sort_hint.pack(anchor="w")
+        # "Undo last sort" banner: shown while the undo log has a batch, also after a restart
+        self.undo_bar = ctk.CTkFrame(self.sort.head, corner_radius=T.R_BUTTON, fg_color=T.ACCENT_SOFT)
+        self.undo_text = ctk.CTkLabel(self.undo_bar, text="", font=(FONT, 14), text_color=T.TEXT)
+        self.undo_text.pack(side="left", padx=14, pady=8)
+        self.undo_btn = ctk.CTkButton(self.undo_bar, text="Undo last sort", corner_radius=T.R_BUTTON, height=34,
                                       font=(FONT, 14), command=self.undo, **GHOST)
-        self.undo_btn.pack(side="right")
+        self.undo_btn.pack(side="right", padx=8, pady=6)
 
     def _build_large_header(self) -> None:
         self.min_mb = ctk.StringVar(value=str(self.settings.get("min_mb", "100")))
@@ -612,10 +786,23 @@ class App(ctk.CTk):
                              border_color=T.BORDER_CONTROL, corner_radius=T.R_BUTTON)
             e.pack(side="left", padx=(0, 16))
             e.bind("<Return>", lambda _e: self.refilter())
-        ctk.CTkLabel(self.large.head, text="0 turns a filter off", font=(FONT, 13),
-                     text_color=T.TEXT_MUTED).pack(side="left")
+        self.large_hint = ctk.CTkLabel(self.large.head, text="0 turns a filter off", font=(FONT, 13),
+                                       text_color=T.TEXT_MUTED)
+        self.large_hint.pack(side="left")
         ctk.CTkButton(self.large.head, text="Apply", width=80, height=38, corner_radius=T.R_BUTTON,
                       font=(FONT, 14), command=self.refilter, **GHOST).pack(side="right")
+        self.installers = False
+        self.pill = ctk.CTkButton(self.large.head, text="Old installers", width=120, height=34,
+                                  corner_radius=T.R_PILL, font=(FONT, 14), command=self._toggle_installers, **GHOST)
+        self.pill.pack(side="right", padx=(0, 10))
+
+    def _toggle_installers(self) -> None:
+        on = self.installers = not self.installers
+        self.pill.configure(fg_color=T.ACCENT_SOFT if on else "transparent",
+                            text_color=T.ACCENT_TEXT if on else T.TEXT_NAV,
+                            border_color=T.ACCENT_TEXT if on else T.BORDER_CONTROL)
+        self.large_hint.configure(text="Installers untouched for 30+ days, any size" if on else "0 turns a filter off")
+        self.refilter()
 
     # ---------- folder + background work ----------
 
@@ -663,6 +850,9 @@ class App(ctk.CTk):
         if self._busy:
             return self.status.configure(text="Still working. Please wait a moment.")
         self._cancel.clear()
+        # Free destroyed rows' Tk variables here: if the worker's garbage collection freed them,
+        # tkinter would call into Tk from the wrong thread (stalls, "main thread is not in main loop").
+        gc.collect()
         self._set_busy(True, cancellable)
 
         def target():
@@ -708,6 +898,14 @@ class App(ctk.CTk):
         T.save_settings(min_mb=self.min_mb.get(), older_days=self.older.get())
         return mb, days
 
+    def _large_query(self) -> dict | None:
+        params = self._large_params()
+        if params is None:
+            return None
+        if self.installers:  # "Old installers" pill: any size, untouched for 30+ days
+            return dict(min_mb=0, older_days=30, exts=core.CATEGORIES["Installers"])
+        return dict(min_mb=params[0], older_days=params[1])
+
     def _save_filters(self) -> None:
         """Settings page: remember valid values quietly; invalid ones are reported when used."""
         try:
@@ -717,19 +915,19 @@ class App(ctk.CTk):
             pass
 
     def scan(self) -> None:
-        params = self._large_params()
-        if not self.folder or not params:
+        query = self._large_query()
+        if not self.folder or not query:
             return
-        folder, c, p = self.folder, self._cancel.is_set, self._progress
+        folder, c, p, pins = self.folder, self._cancel.is_set, self._progress, list(self.pins)
 
         def work():
             p("Reading the folder…")
-            entries = core.scan_entries(folder, cancel=c)  # one walk shared by all checks
+            entries = core.scan_entries(folder, cancel=c, ignore=pins)  # one walk shared by all checks
             moves = core.plan_sort(folder, cancel=c, entries=entries)
             dups = core.find_duplicates(folder, progress=p, cancel=c, entries=entries)
-            large = core.find_large_old(folder, *params, cancel=c, entries=entries)
+            large = core.find_large_old(folder, cancel=c, entries=entries, **query)
             p("Looking for empty folders…")
-            return entries, moves, dups, large, core.find_empty_dirs(folder, cancel=c)
+            return entries, moves, dups, large, core.find_empty_dirs(folder, cancel=c, ignore=pins)
 
         self.status.configure(text="Scanning…")
         self._run(work, self._scan_done)
@@ -765,26 +963,14 @@ class App(ctk.CTk):
 
     def _fill_sort(self, moves: list[core.Move]) -> None:
         self.moves = moves
-        by_cat: dict[str, list[str]] = {}
-        self.cat_sizes = {}
-        for m in moves:
-            by_cat.setdefault(m.category, []).append(m.src.name)
-            self.cat_sizes[m.category] = self.cat_sizes.get(m.category, 0) + m.size
-        rows = []
-        for cat, names in sorted(by_cat.items()):
-            eg = ", ".join(names[:3]) + (", …" if len(names) > 3 else "")
-            rows.append((f"{cat}: {plural(len(names), 'file')}   (e.g. {eg})", cat))
-        self.sort.set_rows(rows, True)
-
-    def _category_size(self, cat: str) -> int:
-        return self.cat_sizes.get(cat, 0)
+        self.sort.set_moves(moves)
 
     def _size(self, p: Path) -> int:
         return self.sizes[p] if p in self.sizes else file_size(p)
 
-    def _sort_selected(self) -> list[core.Move]:
-        on = set(self.sort.selected())
-        return [m for m in self.moves if m.category in on]
+    def _unpinned(self, paths: list) -> list:
+        """Re-check right before acting: a pin added after the scan still protects its files."""
+        return [p for p in paths if not core.is_pinned(getattr(p, "src", p), self.pins)]
 
     def _fill_dups(self, groups: list[core.DupGroup]) -> None:
         for g in groups:
@@ -807,10 +993,10 @@ class App(ctk.CTk):
     # ---------- sort actions ----------
 
     def move(self) -> None:
-        sel = self._sort_selected()
+        sel = self._unpinned(self.sort.selected())
         if sel and confirm(
-                self, "Move files?", f"Move {plural(len(sel), 'file')} into type folders inside\n{self.folder}?\n\n"
-                "Nothing is deleted. You can undo this with \"Undo last sort\".", "Move files"):
+                self, "Sort files?", f"Move {plural(len(sel), 'file')} into type folders inside\n{self.folder}?\n\n"
+                "Nothing is deleted. You can undo this with \"Undo last sort\".", f"Sort {plural(len(sel), 'file')}"):
             folder = self.folder
             self._run(lambda: core.apply_moves(sel, folder), self._move_done, cancellable=False)
 
@@ -820,9 +1006,11 @@ class App(ctk.CTk):
         self.scan()
 
     def undo(self) -> None:
-        if not core.can_undo():
+        n = core.undo_count()
+        if not n:
             return messagebox.showinfo("Undo", "Nothing to undo.")
-        if confirm(self, "Undo last sort?", "Put the files from the last sort back where they were?", "Undo"):
+        if confirm(self, "Undo last sort?", f"Put the {plural(n, 'file')} from the last sort back where they were?",
+                   f"Undo {plural(n, 'file')}"):
             self._run(core.undo_last, self._undo_done, cancellable=False)
 
     def _undo_done(self, result: tuple[int, list[str]]) -> None:
@@ -831,19 +1019,24 @@ class App(ctk.CTk):
         self.scan()
 
     def _refresh_undo(self) -> None:
-        self.undo_btn.configure(state="normal" if core.can_undo() else "disabled")
+        n = core.undo_count()
+        if n:
+            self.undo_text.configure(text=f"Your last sort moved {plural(n, 'file')}.")
+            self.undo_bar.pack(fill="x", pady=(0, 8), before=self.sort_hint)
+        else:
+            self.undo_bar.pack_forget()
 
     # ---------- recycle-bin actions ----------
 
     def refilter(self) -> None:
-        params = self._large_params()
-        if not self.folder or not params:
+        query = self._large_query()
+        if not self.folder or not query:
             return
         folder, c, entries = self.folder, self._cancel.is_set, self.entries
-        self._run(lambda: core.find_large_old(folder, *params, cancel=c, entries=entries), self._fill_large)
+        self._run(lambda: core.find_large_old(folder, cancel=c, entries=entries, **query), self._fill_large)
 
     def remove_dups(self) -> None:
-        removals = [(g, [f for i, f in enumerate(g.files) if i != keep.get()])
+        removals = [(g, self._unpinned([f for i, f in enumerate(g.files) if i != keep.get()]))
                     for inc, keep, g in self.dups.visible_groups() if inc.get()]
         try:  # safety rule 6; the radio buttons already make this impossible
             core.check_dup_selection([g for _, _, g in self.dups.groups],
@@ -861,11 +1054,13 @@ class App(ctk.CTk):
             "They are not deleted. You can restore them from the Recycle Bin.", f"Send {plural(n, 'item')}")
 
     def recycle(self, paths: list[Path]) -> None:
+        paths = self._unpinned(paths)
         if paths and self._confirm_bin(len(paths)):
             folder = self.folder
             self._run(lambda: core.to_recycle_bin(paths, folder), self._recycled, cancellable=False)
 
     def recycle_empty(self, paths: list[Path]) -> None:
+        paths = self._unpinned(paths)
         if paths and self._confirm_bin(len(paths)):
             folder = self.folder
             self._run(lambda: core.trash_empty_dirs(paths, folder), self._recycled, cancellable=False)

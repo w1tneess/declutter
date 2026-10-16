@@ -84,7 +84,7 @@ const APP_EXTENSIONS_MAP = [
     icon: '🖼️',
     color: '#38BDF8',
     exts: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.heic', '.tiff', '.ico'],
-    description: 'High-res photos, vectors, raw camera exports, and UI assets.',
+    description: 'High-res photos, vectors, raw camera exports, and UI assets. Screenshots and chat pictures route to Images/Screenshots and Images/Chat.',
   },
   {
     name: 'Documents',
@@ -203,7 +203,7 @@ export default function App() {
     setTimeout(() => setCopiedHash(false), 2200);
   };
 
-  // --- File Upload / Drag & Drop Logic (100% Client-Side) ---
+  // --- File Upload / Drag & Drop Logic (Client-Side Simulation) ---
   const processUploadedFiles = (filesList) => {
     const fileArray = Array.from(filesList);
     if (fileArray.length === 0) return;
@@ -263,7 +263,7 @@ export default function App() {
       setDuplicates(detectedDups);
     }
 
-    showToast(`📂 Loaded ${parsed.length} local files! All processing is 100% private in your browser.`);
+    showToast(`Loaded ${parsed.length} local files into browser simulation. Moves no real files.`);
   };
 
   const handleFileInputChange = (e) => {
@@ -295,7 +295,7 @@ export default function App() {
     setIsSorted(false);
     setDuplicates(INITIAL_DUPLICATES);
     setSelectedLargeIds({});
-    showToast('📁 Switched to Sample Downloads sandbox.');
+    showToast('Switched to Sample Downloads sandbox.');
   };
 
   // --- Sort Logic ---
@@ -312,13 +312,13 @@ export default function App() {
       setIsSorted(true);
       setSortAnimating(false);
       const organizedCount = currentFiles.filter(f => selectedCategories[f.category]).length;
-      showToast(`⚡ Organized ${organizedCount} files into structured category folders!`);
+      showToast(`Organized ${organizedCount} files into structured category folders.`);
     }, 500);
   };
 
   const handleUndoSort = () => {
     setIsSorted(false);
-    showToast('↩️ 1-Click Undo: Restored all files back to the root folder.');
+    showToast('Undo last sort: restored simulation files back to root.');
   };
 
   // --- Duplicate Logic ---
@@ -353,7 +353,7 @@ export default function App() {
     setReclaimedMB(prev => prev + spaceGain);
     setDuplicates([]);
     setConfirmDialog(null);
-    showToast(`🗑️ Moved ${duplicatesToRemove.length} duplicate copies to the Recycle Bin (+${spaceGain.toFixed(1)} MB saved)!`);
+    showToast(`Moved ${duplicatesToRemove.length} duplicate copies to the Recycle Bin (+${spaceGain.toFixed(1)} MB).`);
   };
 
   // --- Large Files Logic ---
@@ -382,14 +382,14 @@ export default function App() {
     setReclaimedMB(prev => prev + spaceGain);
     setSelectedLargeIds({});
     setConfirmDialog(null);
-    showToast(`🗑️ Sent ${targets.length} large files to Recycle Bin (+${spaceGain.toFixed(1)} MB freed)!`);
+    showToast(`Sent ${targets.length} large files to Recycle Bin (+${spaceGain.toFixed(1)} MB).`);
   };
 
   // --- Empty Folders Logic ---
   const handlePruneEmptyFolders = () => {
     const count = emptyFolders.length;
     setEmptyFolders([]);
-    showToast(`🧹 Safely pruned ${count} empty folder branches deepest-first.`);
+    showToast(`Pruned ${count} empty folder branches deepest-first.`);
   };
 
   // --- Restore from Recycle Bin ---
@@ -399,7 +399,7 @@ export default function App() {
     setDuplicates(INITIAL_DUPLICATES);
     setEmptyFolders(INITIAL_EMPTY_FOLDERS);
     setReclaimedMB(0);
-    showToast(`♻️ Restored ${count} items back to their active locations!`);
+    showToast(`Restored ${count} items back to their active locations.`);
   };
 
   const handleResetAllDemo = () => {
@@ -419,7 +419,7 @@ export default function App() {
       'Code & Data': true,
       'Other Files': true,
     });
-    showToast('↺ Demo reset to initial chaotic state.');
+    showToast('Simulation reset to initial state.');
   };
 
   // Categories currently present in the active file set
@@ -510,16 +510,16 @@ export default function App() {
           <div className="hero-text-content">
             <div className="hero-badge">
               <span className="hero-badge-pulse"></span>
-              <span>Windows Desktop Utility • 100% Offline & Private</span>
+              <span>Windows Desktop Utility • Offline & Private</span>
             </div>
 
             <h1 className="hero-headline">
               Tidy your messy folders <br />
-              <span className="text-gradient">without risking a single file.</span>
+              <span className="text-gradient">and check every change first.</span>
             </h1>
 
             <p className="hero-lead">
-              Declutter organizes chaotic directories into structured categories, detects duplicate files with cryptographic SHA-256 accuracy, and safely removes empty folders — with mandatory visual previews and instant 1-click undo.
+              Declutter organizes loose files into structured categories, detects duplicate files by SHA-256 content comparison, and safely cleans empty folders — with visual previews and 1-click undo for your last sort.
             </p>
 
             <div className="hero-cta-row">
@@ -548,34 +548,34 @@ export default function App() {
             {/* Quick Metrics */}
             <div className="hero-metrics-bar">
               <div className="metric-cell">
-                <span className="metric-val">100%</span>
-                <span className="metric-desc">Recycle Bin safety</span>
+                <span className="metric-val">Recycle Bin</span>
+                <span className="metric-desc">Local drive removals</span>
               </div>
               <div className="metric-cell">
                 <span className="metric-val">0 bytes</span>
-                <span className="metric-desc">Telemetry · 100% Offline</span>
+                <span className="metric-desc">Telemetry · Offline only</span>
               </div>
               <div className="metric-cell">
                 <span className="metric-val">1 Click</span>
-                <span className="metric-desc">Instant Sort Undo</span>
+                <span className="metric-desc">Undo last sort</span>
               </div>
               <div className="metric-cell">
                 <span className="metric-val">SHA-256</span>
-                <span className="metric-desc">Bit-for-bit accuracy</span>
+                <span className="metric-desc">Content comparison</span>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* ==================== Web-Native Declutter Studio (Try the Real Declutter UI) ==================== */}
+      {/* ==================== Web-Native Declutter Studio (Simulation) ==================== */}
       <section className="studio-section" id="simulator">
         <div className="container">
           <div className="section-head text-center">
-            <span className="section-tag">Web Interactive Edition • 100% Client-Side</span>
-            <h2>Try the Real Declutter UI</h2>
+            <span className="section-tag">Browser Simulation • Interactive Preview</span>
+            <h2>Simulate Declutter in your browser</h2>
             <p className="section-sub">
-              Test Declutter's sorting engine, SHA-256 duplicate scanner, and instant undo right in your browser. All calculations run 100% privately in your browser memory — no data leaves your machine.
+              Test how Declutter's sorting workflow, SHA-256 duplicate scanner, and undo feel right in your browser. This interactive simulation runs in memory and moves no real files — the desktop app handles real folders on Windows.
             </p>
           </div>
 
@@ -617,6 +617,7 @@ export default function App() {
                     ? `Organized in ${sortedBuckets.length} categories`
                     : `${currentFiles.length} scattered loose files`})
                 </span>
+                <span className="simulation-tag-pill">Simulation only — moves no real files</span>
               </div>
 
               {/* Data Source Switcher */}
@@ -725,7 +726,7 @@ export default function App() {
                     <div className="control-right">
                       {isSorted ? (
                         <button className="btn btn-undo-action" onClick={handleUndoSort}>
-                          <span>↩️ 1-Click Undo</span>
+                          <span>↩️ Undo last sort</span>
                         </button>
                       ) : (
                         <button
@@ -792,7 +793,7 @@ export default function App() {
                         <span>
                           ✅ <strong>Organized: {currentFiles.filter(f => selectedCategories[f.category]).length} files grouped into {sortedBuckets.length} structured folders</strong>
                         </span>
-                        <span className="hint-tag">Click "1-Click Undo" above anytime to restore</span>
+                        <span className="hint-tag">Click "Undo last sort" above anytime to revert</span>
                       </div>
 
                       <div className="category-folders-grid">
@@ -845,9 +846,9 @@ export default function App() {
                 <div className="studio-pane">
                   <div className="pane-control-bar">
                     <div className="control-left">
-                      <h4>Two-Tier SHA-256 Duplicate Detector</h4>
+                      <h4>SHA-256 Duplicate Detector</h4>
                       <p>
-                        Exact bit-for-bit file verification. Toggle which copy to protect. Cleaned duplicates move safely to the Recycle Bin.
+                        Content verification via size, partial hash, and full SHA-256 comparison. The oldest copy is kept by default; at least one copy always remains. Removals move to the Recycle Bin on local drives.
                       </p>
                     </div>
                     {duplicates.length > 0 && (
@@ -1044,7 +1045,7 @@ export default function App() {
                 <span>
                   <strong>Windows Recycle Bin Simulation:</strong>{' '}
                   {recycledItems.length === 0
-                    ? 'No deleted files. Everything is intact.'
+                    ? 'No removed files. Everything is intact.'
                     : `${recycledItems.length} items safely held (${reclaimedMB.toFixed(1)} MB reclaimable).`}
                 </span>
               </div>
@@ -1064,8 +1065,8 @@ export default function App() {
                 <h3>Send items to Windows Recycle Bin?</h3>
                 <p>
                   {confirmDialog === 'duplicates'
-                    ? `Move ${duplicates.length} redundant duplicate copies to the Recycle Bin? Nothing is permanently destroyed, and you can restore them anytime.`
-                    : `Send ${Object.values(selectedLargeIds).filter(Boolean).length} selected space hogs to the Recycle Bin? You can restore them anytime.`}
+                    ? `Move ${duplicates.length} redundant duplicate copies to the Recycle Bin? On local drives, items go to the Recycle Bin where you can restore them.`
+                    : `Send ${Object.values(selectedLargeIds).filter(Boolean).length} selected space hogs to the Recycle Bin? On local drives, items go to the Recycle Bin where you can restore them.`}
                 </p>
                 <div className="modal-btn-row">
                   <button className="btn btn-ghost" onClick={() => setConfirmDialog(null)}>Cancel</button>
@@ -1087,9 +1088,9 @@ export default function App() {
         <div className="container">
           <div className="section-head text-center">
             <span className="section-tag">Core Architecture</span>
-            <h2>Four focused engines. Zero compromise.</h2>
+            <h2>Four focused tools. Plain safeguards.</h2>
             <p className="section-sub">
-              Engineered specifically for Windows power users and everyday creators who want disk order without risking their valuable work.
+              Engineered specifically for Windows users who want tidy folders, with a preview before every change.
             </p>
           </div>
 
@@ -1103,20 +1104,22 @@ export default function App() {
                     <line x1="12" y1="11" x2="12" y2="17"></line>
                     <line x1="9" y1="14" x2="15" y2="14"></line>
                   </svg>
-                  <span>Engine 01</span>
+                  <span>Tool 01</span>
                 </div>
-                <span className="bento-badge-highlight">Atomic Undo Enabled</span>
+                <span className="bento-badge-highlight">Undo Last Sort</span>
               </div>
 
               <div className="bento-body">
-                <h3>Intelligent Sort by Type</h3>
+                <h3>Sort by Type</h3>
                 <p>
-                  Scans loose files in any target directory and organizes them into neat, structured categories (Images, Documents, Videos, Audio, Archives, Installers, Code). Never overwrites existing files — collisions automatically receive non-destructive numbering like <code>photo (1).jpg</code>.
+                  Organizes top-level loose files into structured categories (Images, Documents, Videos, Audio, Archives, Installers, Code, Other). Screenshots and chat pictures route into <code>Images/Screenshots</code> and <code>Images/Chat</code> sub-folders. Files touched in the last 24 hours are left alone, and name clashes become <code>photo (1).jpg</code>.
                 </p>
 
                 {/* Visual Category Flow */}
                 <div className="bento-visual-categories">
                   <div className="cat-pill"><span className="cat-emoji">🖼️</span> Images <span className="cat-count">84</span></div>
+                  <div className="cat-pill"><span className="cat-emoji">📸</span> Images/Screenshots <span className="cat-count">36</span></div>
+                  <div className="cat-pill"><span className="cat-emoji">💬</span> Images/Chat <span className="cat-count">14</span></div>
                   <div className="cat-pill"><span className="cat-emoji">📄</span> Documents <span className="cat-count">42</span></div>
                   <div className="cat-pill"><span className="cat-emoji">🎬</span> Videos <span className="cat-count">18</span></div>
                   <div className="cat-pill"><span className="cat-emoji">📦</span> Archives <span className="cat-count">12</span></div>
@@ -1125,7 +1128,7 @@ export default function App() {
 
                 <div className="bento-footer-note">
                   <span className="note-icon">↩️</span>
-                  <span>Full atomic rollback: 1-click returns every moved file to its exact prior path.</span>
+                  <span>Undo last sort: returns files of the most recent sort back to their previous locations; skips any files modified since the sort.</span>
                 </div>
               </div>
             </div>
@@ -1138,25 +1141,25 @@ export default function App() {
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                   </svg>
-                  <span>Engine 02</span>
+                  <span>Tool 02</span>
                 </div>
                 <span className="bento-badge-crypto">SHA-256</span>
               </div>
 
               <div className="bento-body">
-                <h3>Two-Tier Duplicate Engine</h3>
+                <h3>Duplicates Engine</h3>
                 <p>
-                  Zero guesswork. Clusters candidates by exact byte size, scans a fast 64KB partial signature, and calculates full SHA-256 hashes to guarantee true duplicates regardless of filenames.
+                  Compared by SHA-256: matches exact size, checks the first and last 64 KB, then computes full SHA-256 hashes. Oldest copy is kept by default, and at least one copy always remains. "Possible re-downloads" like <code>file (1).pdf</code> are never ticked for you.
                 </p>
 
                 <div className="bento-visual-hash-box">
                   <div className="hash-header">
                     <span>Cryptographic Verification</span>
-                    <span className="hash-status">100% Match</span>
+                    <span className="hash-status">SHA-256 Match</span>
                   </div>
                   <code>sha256: 9f86d081884c7d659a2feaa0c...</code>
                   <div className="hash-preserve-label">
-                    <span>Oldest original protected as permanent keeper</span>
+                    <span>Oldest copy kept by default; keeper can be changed</span>
                   </div>
                 </div>
               </div>
@@ -1170,15 +1173,15 @@ export default function App() {
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                   </svg>
-                  <span>Engine 03</span>
+                  <span>Tool 03</span>
                 </div>
-                <span className="bento-badge-metric">Storage Radar</span>
+                <span className="bento-badge-metric">Size & Age</span>
               </div>
 
               <div className="bento-body">
-                <h3>Large & Inactive File Radar</h3>
+                <h3>Large & Old Files</h3>
                 <p>
-                  Instantly pinpoint forgotten virtual disks, giant video renders, and old installer archives quietly devouring your SSD with custom minimum size (MB) and inactivity days filters.
+                  Filters files by minimum size (MB) and inactivity age (days untouched). Flags "likely leftovers" (unpacked zips, installers over 7 days old in Downloads, and unfinished downloads over 3 days old) without ticking them for you.
                 </p>
 
                 <div className="bento-visual-storage-meter">
@@ -1206,7 +1209,7 @@ export default function App() {
                     <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
                     <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
                   </svg>
-                  <span>Engine 04</span>
+                  <span>Tool 04</span>
                 </div>
                 <span className="bento-badge-tree">Bottom-Up</span>
               </div>
@@ -1223,6 +1226,38 @@ export default function App() {
                   <div className="tree-node depth-3 prune-target">
                     └─ 📁 empty_subcache
                     <span className="prune-badge">Pruned safely</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bento Card 5: Desktop Integration & Never Touch */}
+            <div className="bento-card bento-card-integration">
+              <div className="bento-header">
+                <div className="bento-icon-pill">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  </svg>
+                  <span>v0.2.0</span>
+                </div>
+                <span className="bento-badge-highlight">Windows Integration</span>
+              </div>
+
+              <div className="bento-body">
+                <h3>"Never Touch" & Context Menu</h3>
+                <p>
+                  Pin sensitive folders to your "Never touch" list so Declutter never scans or touches them. Right-click any folder in Windows Explorer and select "Tidy with Declutter" for immediate access.
+                </p>
+
+                <div className="bento-visual-pins">
+                  <div className="pin-item">
+                    <span className="pin-icon">📌</span>
+                    <span>Pinned: <code>Projects/ActiveWork</code></span>
+                    <span className="pin-badge">Protected</span>
+                  </div>
+                  <div className="pin-item context-item">
+                    <span className="pin-icon">🖱️</span>
+                    <span>Right-click &rarr; <strong>"Tidy with Declutter"</strong></span>
                   </div>
                 </div>
               </div>
@@ -1312,65 +1347,24 @@ export default function App() {
         </div>
       </section>
 
-      {/* ==================== Safe-by-Design Comparison Architecture ==================== */}
+      {/* ==================== Safe-by-Design Architecture ==================== */}
       <section className="safety-section" id="safety">
         <div className="container">
           <div className="section-head text-center">
             <span className="section-tag">Safety by Design</span>
-            <h2>Why Declutter is fundamentally different</h2>
+            <h2>Hardcoded guardrails for your files</h2>
             <p className="section-sub">
-              Most "cleaners" are risky black boxes. Declutter is engineered with hardcoded guardrails that make catastrophic file loss impossible.
+              Declutter tells you what it will touch before anything moves, confirms counts, and keeps your files safe.
             </p>
           </div>
 
           <div className="comparison-table-wrapper">
-            <div className="comparison-column risk-column">
-              <div className="column-header">
-                <span className="column-status-icon">⚠️</span>
-                <div>
-                  <h3>Traditional Cleaners & Scripts</h3>
-                  <p>Risky, opaque, and permanent</p>
-                </div>
-              </div>
-
-              <ul className="comparison-list">
-                <li>
-                  <span className="cross-icon">✕</span>
-                  <div>
-                    <strong>Permanent Deletion (Shift+Delete)</strong>
-                    <p>Wipes files directly from disk sectors, making accidental loss irreversible without forensic recovery tools.</p>
-                  </div>
-                </li>
-                <li>
-                  <span className="cross-icon">✕</span>
-                  <div>
-                    <strong>Dangerous Windows Registry Cleaning</strong>
-                    <p>Tampering with registry keys frequently corrupts file associations and breaks critical system dependencies.</p>
-                  </div>
-                </li>
-                <li>
-                  <span className="cross-icon">✕</span>
-                  <div>
-                    <strong>Background Telemetry & Ad Upsells</strong>
-                    <p>Tracks your activity, beacons usage data to cloud servers, and nags you with "Pro subscription" popups.</p>
-                  </div>
-                </li>
-                <li>
-                  <span className="cross-icon">✕</span>
-                  <div>
-                    <strong>Blind Cleaning Without Previews</strong>
-                    <p>Deletes behind your back with single-click magic buttons before you can verify what was removed.</p>
-                  </div>
-                </li>
-              </ul>
-            </div>
-
             <div className="comparison-column safety-column">
               <div className="column-header">
                 <span className="column-status-icon safe">🛡️</span>
                 <div>
-                  <h3>Declutter Safe Architecture</h3>
-                  <p>100% restorable, private, and verified</p>
+                  <h3>Declutter Safety Safeguards</h3>
+                  <p>Verified on local drives with confirmation before action</p>
                 </div>
               </div>
 
@@ -1378,36 +1372,36 @@ export default function App() {
                 <li>
                   <span className="check-icon">✓</span>
                   <div>
-                    <strong>100% Windows Recycle Bin Guarantee</strong>
-                    <p>All deletions route safely into your desktop Recycle Bin. Any removed file can be immediately restored with a single click.</p>
+                    <strong>Recycle Bin Removals on Local Drives</strong>
+                    <p>All removals route to your Windows Recycle Bin on local fixed drives. Items can be restored directly from the Recycle Bin. Removals are refused on USB sticks and network drives.</p>
                   </div>
                 </li>
                 <li>
                   <span className="check-icon">✓</span>
                   <div>
-                    <strong>Instant 1-Click Sort Undo</strong>
-                    <p>Every organize operation creates an instant local recovery point. One click returns all moved files back to their exact original locations.</p>
+                    <strong>Undo Last Sort</strong>
+                    <p>Puts the files of the most recent sort back to their previous locations and cleans up empty folders that were created. Any file modified since the sort is skipped and reported.</p>
                   </div>
                 </li>
                 <li>
                   <span className="check-icon">✓</span>
                   <div>
-                    <strong>100% Offline with Zero Telemetry</strong>
-                    <p>Declutter makes zero internet connections. No analytics, tracking tokens, or diagnostics leave your machine. Completely local and private.</p>
+                    <strong>Zero Telemetry and Offline Execution</strong>
+                    <p>The desktop app makes no network connections and sends no telemetry. Settings and undo logs stay locally in %LOCALAPPDATA%\Declutter.</p>
                   </div>
                 </li>
                 <li>
                   <span className="check-icon">✓</span>
                   <div>
-                    <strong>Mandatory Checklists & Confirmation</strong>
-                    <p>Nothing on disk changes without your review. You inspect itemized lists and confirm explicit file-count dialogs before anything moves.</p>
+                    <strong>Mandatory Previews and Confirmation</strong>
+                    <p>Nothing on disk changes without confirmation. Every tool shows an itemized preview and asks you to confirm the exact count before anything moves.</p>
                   </div>
                 </li>
                 <li>
                   <span className="check-icon">✓</span>
                   <div>
-                    <strong>Protected System Folders & Cloud Stubs</strong>
-                    <p>Built-in safeguards automatically protect drive roots, operating system directories, and cloud placeholders so your system stays pristine.</p>
+                    <strong>Protected Locations & "Never Touch" List</strong>
+                    <p>Drive roots, the user home folder, Windows, Program Files, AppData, and code projects (.git, node_modules) are never entered. Any folder pinned under "Never touch" is strictly skipped.</p>
                   </div>
                 </li>
               </ul>
@@ -1434,7 +1428,7 @@ export default function App() {
               <div className="step-badge">01</div>
               <div className="step-content">
                 <h3>Select a Directory</h3>
-                <p>Quick-pick your Downloads, Desktop, or Documents with one click, or choose any folder on your hard drive or external USB storage.</p>
+                <p>Right-click any folder in Windows Explorer and choose "Tidy with Declutter", quick-pick your Downloads, Desktop, or Documents, or choose any folder on your hard drive or external USB storage (removals are refused on USB and network drives).</p>
               </div>
             </div>
 
@@ -1450,7 +1444,7 @@ export default function App() {
               <div className="step-badge">03</div>
               <div className="step-content">
                 <h3>Review & Execute</h3>
-                <p>Inspect the live itemized checkboxes. Confirm the exact count modal. All removals go safely into your native Windows Recycle Bin.</p>
+                <p>Inspect the live itemized checkboxes. Confirm the exact count modal. On local fixed drives, all removals go safely into your native Windows Recycle Bin.</p>
               </div>
             </div>
           </div>
@@ -1465,7 +1459,7 @@ export default function App() {
               <span className="section-tag">Get Declutter for Windows</span>
               <h2>Download Declutter</h2>
               <p className="hub-sub">
-                Version <strong>{release.version}</strong> {release.releaseDate ? `• Published ${release.releaseDate}` : ''} • Free, open source & 100% private
+                Version <strong>{release.version}</strong> {release.releaseDate ? `• Published ${release.releaseDate}` : ''} • Free, open source & private
               </p>
             </div>
 
@@ -1501,6 +1495,7 @@ export default function App() {
                     </svg>
                     <span>Download Declutter-Setup.exe {release.setupSize ? `(${release.setupSize})` : ''}</span>
                   </a>
+                  <p className="download-smartscreen-notice">The app is not code-signed: Windows SmartScreen shows "Unknown publisher" (click <strong>More info</strong>, then <strong>Run anyway</strong>).</p>
                 </div>
               ) : (
                 <div className="format-panel">
@@ -1514,6 +1509,7 @@ export default function App() {
                     </svg>
                     <span>Download Declutter-portable.zip {release.portableSize ? `(${release.portableSize})` : ''}</span>
                   </a>
+                  <p className="download-smartscreen-notice">The app is not code-signed: Windows SmartScreen shows "Unknown publisher" (click <strong>More info</strong>, then <strong>Run anyway</strong>).</p>
                 </div>
               )}
 
@@ -1581,31 +1577,31 @@ export default function App() {
             {[
               {
                 q: "Can Declutter ever permanently destroy my files?",
-                a: "Never. Declutter only moves files directly to your native Windows Recycle Bin. Any removed item can be restored with a single click directly from the Recycle Bin."
+                a: "Removals go to the native Windows Recycle Bin on local fixed drives, where you can restore them anytime. On USB sticks and network drives, removals are refused because those drives may lack a Recycle Bin."
               },
               {
-                q: "How does 1-click Undo work for file sorts?",
-                a: "Whenever files are organized, Declutter maintains an instant local undo record. Clicking 'Undo last sort' seamlessly returns every file back to its original location and cleans up any empty category folders that were created."
+                q: "How does Undo work for file sorts?",
+                a: "Declutter logs moves from the most recent sort to %LOCALAPPDATA%\\Declutter\\undo.json. Clicking 'Undo last sort' returns those files to their previous locations and removes empty category folders. Any file changed since the sort is skipped and reported. Undo covers the last sort only and does not restore items sent to the Recycle Bin."
               },
               {
                 q: "What happens if a file with the same name already exists during a sort?",
-                a: "Declutter never overwrites your files. If a file with the same name already exists in a destination folder, the newly organized file is automatically renamed with a clean counter (e.g., photo (1).jpg) so nothing is ever replaced or lost."
+                a: "Declutter never overwrites your files. If a file with the same name already exists in a destination folder, the newly organized file is automatically renamed with a clean counter (e.g., photo (1).jpg) so no existing file is overwritten."
               },
               {
-                q: "Does Declutter force-download my OneDrive or Dropbox cloud files?",
-                a: "No. Declutter automatically detects cloud-only placeholder files (like OneDrive Files On-Demand or Dropbox Smart Sync) and leaves them untouched. It never triggers accidental bandwidth-heavy downloads or fills up your local disk space."
+                q: "Does Declutter download my OneDrive online-only files?",
+                a: "No. Declutter detects OneDrive online-only placeholder files (Files On-Demand) and leaves them alone: they are never read, moved or removed, so nothing gets downloaded. Other cloud drives are not supported."
               },
               {
-                q: "How does the duplicate engine guarantee 100% accuracy?",
-                a: "It compares exact file contents, never just names. Candidate files must match exact byte size, then match a partial content hash, and finally pass a full cryptographic SHA-256 check before being identified as duplicates."
+                q: "How does the duplicate engine compare files?",
+                a: "It compares file content, not just names: candidates must match in byte size, match the first and last 64 KB, and then match a full cryptographic SHA-256 check. The oldest copy is kept by default, and at least one copy always remains."
               },
               {
                 q: "Where are undo records and temporary logs stored?",
-                a: "Everything is kept strictly within your local user profile. Declutter never modifies system files, writes to system directories, or touches the Windows Registry."
+                a: "The undo log and settings are kept in your user profile, in %LOCALAPPDATA%\\Declutter. The app does not change system files. The installer adds a Start menu entry and an uninstall entry for your account, and a right-click \"Tidy with Declutter\" folder entry only if you tick that option."
               },
               {
-                q: "Can I run Declutter on an air-gapped machine without an internet connection?",
-                a: "100% yes. Declutter has zero network dependencies and opens no socket connections. You can copy the portable .zip package to a USB drive and run it on completely disconnected, security-hardened air-gapped workstations."
+                q: "Does Declutter need an internet connection?",
+                a: "No. The app makes no network connections and has no telemetry. You can copy the portable .zip to a USB drive and run it on a computer that is offline."
               },
               {
                 q: "Does Declutter require administrative rights or UAC?",
@@ -1613,7 +1609,11 @@ export default function App() {
               },
               {
                 q: "Does Declutter work on external drives and USB sticks?",
-                a: "Yes. You can select any directory on external hard drives, USB flash drives, or secondary partitions. Protected system directories (like C:\\Windows) are barred, but your personal external drives and storage locations can be scanned and organized freely."
+                a: "You can select, scan, and sort folders on external USB drives and secondary partitions. However, removals to the Recycle Bin are refused on USB sticks and network drives because those drives may not support the Windows Recycle Bin."
+              },
+              {
+                q: "What are likely leftovers and possible re-downloads?",
+                a: "Large & old flags 'likely leftovers' (unpacked zips, installers over 7 days old in Downloads, and unfinished downloads over 3 days old) without ticking them for you. The duplicate engine flags 'possible re-downloads' (like report (1).pdf) and never auto-ticks them for removal."
               }
             ].map((faq, i) => (
               <div key={i} className={`faq-card ${activeFaq === i ? 'active' : ''}`}>

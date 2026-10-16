@@ -515,7 +515,7 @@ export default function App() {
 
             <h1 className="hero-headline">
               Tidy your messy folders <br />
-              <span className="text-gradient">without risking a single file.</span>
+              <span className="text-gradient">and check every change first.</span>
             </h1>
 
             <p className="hero-lead">
@@ -1090,7 +1090,7 @@ export default function App() {
             <span className="section-tag">Core Architecture</span>
             <h2>Four focused tools. Plain safeguards.</h2>
             <p className="section-sub">
-              Engineered specifically for Windows users who want tidy folders without risking loose files or personal work.
+              Engineered specifically for Windows users who want tidy folders, with a preview before every change.
             </p>
           </div>
 
@@ -1585,11 +1585,11 @@ export default function App() {
               },
               {
                 q: "What happens if a file with the same name already exists during a sort?",
-                a: "Declutter never overwrites your files. If a file with the same name already exists in a destination folder, the newly organized file is automatically renamed with a clean counter (e.g., photo (1).jpg) so nothing is ever replaced or lost."
+                a: "Declutter never overwrites your files. If a file with the same name already exists in a destination folder, the newly organized file is automatically renamed with a clean counter (e.g., photo (1).jpg) so no existing file is overwritten."
               },
               {
-                q: "Does Declutter force-download my OneDrive or Dropbox cloud files?",
-                a: "No. Declutter automatically detects cloud-only placeholder files (like OneDrive Files On-Demand or Dropbox Smart Sync) and leaves them untouched. It never triggers accidental bandwidth-heavy downloads or fills up your local disk space."
+                q: "Does Declutter download my OneDrive online-only files?",
+                a: "No. Declutter detects OneDrive online-only placeholder files (Files On-Demand) and leaves them alone: they are never read, moved or removed, so nothing gets downloaded. Other cloud drives are not supported."
               },
               {
                 q: "How does the duplicate engine compare files?",
@@ -1597,11 +1597,11 @@ export default function App() {
               },
               {
                 q: "Where are undo records and temporary logs stored?",
-                a: "Everything is kept strictly within your local user profile in %LOCALAPPDATA%\\Declutter. Declutter never modifies system files, writes to system directories, or touches the Windows Registry."
+                a: "The undo log and settings are kept in your user profile, in %LOCALAPPDATA%\\Declutter. The app does not change system files. The installer adds a Start menu entry and an uninstall entry for your account, and a right-click \"Tidy with Declutter\" folder entry only if you tick that option."
               },
               {
-                q: "Can I run Declutter on an air-gapped machine without an internet connection?",
-                a: "Yes. Declutter has zero network dependencies and opens no socket connections. You can copy the portable .zip package to a USB drive and run it on completely disconnected, security-hardened air-gapped workstations."
+                q: "Does Declutter need an internet connection?",
+                a: "No. The app makes no network connections and has no telemetry. You can copy the portable .zip to a USB drive and run it on a computer that is offline."
               },
               {
                 q: "Does Declutter require administrative rights or UAC?",

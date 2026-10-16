@@ -44,6 +44,10 @@ M = {
     "F undo parent": ("for d in (dst.parent, dst.parent.parent)[:len(_bucket(dst))]:", "for d in (dst.parent,):"),
     "X dups skip shortcuts": ("not in DEAD_EXTS | SKIP_SORT_EXTS):", "not in DEAD_EXTS):"),
     "X redl skip shortcuts": (" or p.suffix.lower() in SKIP_SORT_EXTS:\n            continue", ":\n            continue"),
+    "R1 size pair exact bytes": ('if x != y else f"{a:,} B vs {b:,} B"', 'if True else f"{a:,} B vs {b:,} B"'),
+    "R1 ago plural": ("{'' if n == 1 else 's'}", "{'s'}"),
+    "R1 peek folder": ('UndoInfo(Path(moves[0]["src"]).parent, len(moves), age)', 'UndoInfo(Path(moves[0]["src"]), len(moves), age)'),
+    "R1 peek unreadable time": ("        age = None\n    return UndoInfo", "        age = 0.0\n    return UndoInfo"),
     "F category": ('return "/".join(_bucket(self.dst))', "return self.dst.parent.name"),
 }
 bad = []

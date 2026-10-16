@@ -54,6 +54,12 @@ def date_text(ts: float) -> str:
     return time.strftime("%d %b %Y", time.localtime(ts))
 
 
+def pill(master, text: str) -> ctk.CTkLabel:
+    """A small tag saying why a row was flagged."""
+    return ctk.CTkLabel(master, text=text, font=(FONT, 12), text_color=T.ACCENT_TEXT, fg_color=T.ACCENT_SOFT,
+                        corner_radius=T.R_PILL, height=24)
+
+
 def set_primary(btn, on: bool) -> None:
     """A disabled filled button must not stay bright blue, or it reads as clickable."""
     btn.configure(state="normal" if on else "disabled", fg_color=T.ACCENT if on else T.SURFACE_ALT)
@@ -215,9 +221,11 @@ class Tab(ctk.CTkFrame):
     """
 
     def __init__(self, master, title: str, action: str, on_action: Callable[[], None],
-                 size_of: Callable[[object], int] | None = None, subtitle: str = "", search: bool = True):
+                 size_of: Callable[[object], int] | None = None, subtitle: str = "", search: bool = True,
+                 reclaim: bool = False):
         super().__init__(master, fg_color="transparent")
         self.size_of = size_of
+        self.reclaim = reclaim  # the footer reads "Selected to reclaim: X" instead of "Selected: N items, X"
         self.locked = False  # True while a background job runs
         self.items: list[tuple[ctk.BooleanVar, object]] = []
         self.rows: list[tuple[ctk.CTkBaseClass, str, dict]] = []  # (widget, lowercase text, pack options)
@@ -309,7 +317,8 @@ class Tab(ctk.CTkFrame):
 
         step(0)
 
-    def set_rows(self, rows: list[tuple[str, object]], checked: bool, note: str = "") -> None:
+    def set_rows(self, rows: list[tuple], checked: bool, note: str = "") -> None:
+        """Rows are (text, object) or (text, object, why): `why` is shown as a pill beside the row."""
         if not rows:
             return self.clear("Nothing to clean. Nice.")
         self._reset()
@@ -318,7 +327,7 @@ class Tab(ctk.CTkFrame):
                          anchor="w").pack(fill="x", padx=12, pady=4)
 
         def make(row) -> None:
-            text, obj = row
+            text, obj, *why = row
             if obj is None:  # a heading: a row like the others (so filtering keeps the order), never selectable
                 self.items.append((ctk.BooleanVar(value=False), None))
                 self._add_row(ctk.CTkLabel(self.list, text=text, font=(FONT, 14, "bold"), text_color=T.TEXT,
@@ -326,12 +335,17 @@ class Tab(ctk.CTkFrame):
                 return
             v = ctk.BooleanVar(value=checked)
             self.items.append((v, obj))
-            cb = ctk.CTkCheckBox(self.list, text=text, variable=v, font=(FONT, 15), text_color=T.TEXT,
+            line = ctk.CTkFrame(self.list, fg_color="transparent") if why else self.list
+            cb = ctk.CTkCheckBox(line, text=text, variable=v, font=(FONT, 15), text_color=T.TEXT,
                                  fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
                                  checkmark_color=T.ON_ACCENT, command=self.update_selection)
             if isinstance(obj, Path):
                 cb.bind("<Double-Button-1>", lambda _e, p=obj: reveal(p))
-            self._add_row(cb, text, anchor="w", padx=12, pady=6)
+            if not why:
+                return self._add_row(cb, text, anchor="w", padx=12, pady=6)
+            cb.pack(side="left")
+            pill(line, why[0]).pack(side="right", padx=(12, 0))
+            self._add_row(line, f"{text} {why[0]}", fill="x", padx=12, pady=6)
 
         self._build_chunked(rows, make)
 
@@ -346,9 +360,11 @@ class Tab(ctk.CTkFrame):
 
     def update_selection(self) -> None:
         sel = self.selected()
-        text = f"Selected: {plural(len(sel), 'item')}"
-        if self.size_of and sel:
-            text += f", {core.human_size(sum(self.size_of(o) for o in sel))}"
+        total = sum(self.size_of(o) for o in sel) if self.size_of else 0
+        if self.reclaim:
+            text = f"Selected to reclaim: {core.human_size(total)}" + (f" · {plural(len(sel), 'item')}" if sel else "")
+        else:
+            text = f"Selected: {plural(len(sel), 'item')}" + (f", {core.human_size(total)}" if self.size_of and sel else "")
         if self._q:
             text += f"  ·  {sum(self._shown())} of {len(self.rows)} shown"
         self.sel_label.configure(text=text)
@@ -362,7 +378,7 @@ class DupTab(Tab):
         self.groups: list[tuple[ctk.BooleanVar, ctk.IntVar, core.DupGroup]] = []
         self.copies: list[tuple[ctk.BooleanVar, core.Redownload, int]] = []  # (ticked, pair, index in self.rows)
         super().__init__(master, "Duplicates", "Send to Recycle Bin", on_action, size_of=size_of,
-                         subtitle=HELP["Duplicates"])
+                         subtitle=HELP["Duplicates"], reclaim=True)
 
     def _reset(self) -> None:
         self.groups = []
@@ -390,6 +406,7 @@ class DupTab(Tab):
                             font=(FONT, 14, "bold"), text_color=T.TEXT, fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
                             border_color=T.BORDER_CONTROL, checkmark_color=T.ON_ACCENT,
                             command=self.update_selection).pack(anchor="w", padx=10, pady=(8, 2))
+            pill(box, f"Numbered copy · {core.size_pair(r.copy_size, r.orig_size)}").pack(anchor="w", padx=34, pady=(0, 4))
             cols = ctk.CTkFrame(box, fg_color="transparent")  # the two files side by side
             cols.pack(anchor="w", padx=34, pady=(0, 8))
             for text in (f"This copy: {core.human_size(r.copy_size)} · {date_text(r.copy_mtime)}",
@@ -565,7 +582,7 @@ class App(ctk.CTk):
         self.dups = DupTab(self, self.remove_dups, size_of=self._size)
         self.large = Tab(self, "Large & old files", "Send to Recycle Bin",
                          lambda: self.recycle(self.large.selected()), size_of=self._size,
-                         subtitle=HELP["Large & Old"])
+                         subtitle=HELP["Large & Old"], reclaim=True)
         self._build_large_header()
         self.empty = Tab(self, "Empty folders", "Send to Recycle Bin",
                          lambda: self.recycle_empty(self.empty.selected()),
@@ -1054,10 +1071,10 @@ class App(ctk.CTk):
         days = lambda ts: int((time.time() - ts) / 86400)  # noqa: E731
         rows: list[tuple[str, object]] = []
         if left:
-            rows.append((f"Likely leftovers ({len(left)}). Not guaranteed safe: look at each one. Nothing is ticked.",
+            rows.append((f"Likely leftovers ({len(left)}). Look at each one before you tick it. Nothing is ticked.",
                          None))
-            rows += [(f"{core.human_size(x.size)} · {x.reason} · {days(x.mtime)} days old · {self.rel(x.path)}", x.path)
-                     for x in left[:cap]]
+            rows += [(f"{core.human_size(x.size)} · {days(x.mtime)} days old · {self.rel(x.path)}", x.path,
+                      x.reason + (f" ({x.path.stem})" if x.reason == core.EXTRACTED else "")) for x in left[:cap]]
         if not self.leftovers_only:
             if left and rest:
                 rows.append(("Large and old files", None))
@@ -1086,11 +1103,13 @@ class App(ctk.CTk):
         self.scan()
 
     def undo(self) -> None:
-        n = core.undo_count()
-        if not n:
+        info = core.peek_undo()
+        if not info:
             return messagebox.showinfo("Undo", "Nothing to undo.")
-        if confirm(self, "Undo last sort?", f"Put the {plural(n, 'file')} from the last sort back where they were?",
-                   f"Undo {plural(n, 'file')}"):
+        when = "" if info.age_seconds is None else f" ({core.ago(info.age_seconds)})"
+        if confirm(self, "Undo last sort?", f"Undo the sort of {plural(info.count, 'file')} in "
+                   f"{info.folder.name or info.folder}{when}?\n\nThe files go back where they were.",
+                   f"Undo {plural(info.count, 'file')}"):
             self._run(core.undo_last, self._undo_done, cancellable=False)
 
     def _undo_done(self, result: tuple[int, list[str]]) -> None:

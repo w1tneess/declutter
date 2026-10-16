@@ -245,3 +245,23 @@ def test_sub_bucket_sort_and_undo_leave_no_empty_folders(root):
     assert core.undo_last() == (3, [])
     assert sorted(p.name for p in root.iterdir()) == ["Screenshot 1.png", "WhatsApp Image 1.jpg", "photo.png"]
 
+
+# ---------- shortcuts and config files are never listed as duplicates or re-downloads ----------
+
+def test_shortcut_and_config_files_are_not_duplicates(root):
+    for d in ("one", "two"):
+        touch(root / d / "a.ini", b"[cfg]")
+        touch(root / d / "b.txt", b"text")
+        touch(root / d / "c.LNK", b"link")
+        touch(root / d / "d.url", b"url")
+    groups = core.find_duplicates(root)
+    assert [[f.name for f in g.files] for g in groups] == [["b.txt", "b.txt"]]
+
+
+def test_shortcut_and_config_files_are_not_redownloads(root):
+    for n in ("a.ini", "b.lnk", "c.URL", "d.txt"):
+        stem, ext = n.rsplit(".", 1)
+        touch(root / n, b"x" * 100)
+        touch(root / f"{stem} (1).{ext}", b"y" * 100)
+    assert redl(root) == {"d (1).txt": "d.txt"}
+

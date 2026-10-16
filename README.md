@@ -21,8 +21,8 @@ Uninstall from Windows Settings > Apps. Website source is in `website/` (deploye
 - **Settings**: theme (System, Light, Dark), reopen the last folder at start, the Large & old filters, and a "Never touch" list of pinned files and folders, all remembered.
 - **Right-click a folder > Tidy with Declutter** (optional when installing) opens the app on that folder. `Declutter.exe <folder>` does the same.
 
-![Duplicates, light theme](assets/screenshot-duplicates.png)
-![Large & old files, dark theme](assets/screenshot-dark.png)
+![Duplicates, light theme](site/screenshot-duplicates.png)
+![Large & old files, dark theme](site/screenshot-dark.png)
 
 Removals go to the Recycle Bin, and only on local drives (USB sticks and network drives are refused, since they may have no Bin). Drive roots, your home folder, Windows, Program Files and AppData are refused. Left alone: code projects (folders with `.git`, `node_modules`, `.venv`, `package.json` or a `.sln`), downloads in progress, files changed in the last 5 minutes, OneDrive online-only files (nothing gets downloaded), symlinks, junctions and hidden files. If one file fails (locked, too long a path), the rest still go ahead and the failures are listed.
 

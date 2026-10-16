@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import queue
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -20,6 +21,7 @@ PLAIN = dict(fg_color="transparent", text_color=T.ACCENT_TEXT, hover_color=T.SUR
 # CustomTkinter widgets are slow to build, so long lists are capped to keep the window responsive.
 MAX_ROWS = {"Duplicates": 100, "Large & Old": 200, "Empty Folders": 300}
 NAMES = ("Home", "Sort", "Duplicates", "Large & Old", "Empty Folders")
+NAV_LABEL = {"Sort": "Sort by type", "Large & Old": "Large & old", "Empty Folders": "Empty folders"}
 HELP = {
     "Sort": "Moves loose files into folders by type (Images, Documents, …). Nothing is deleted.",
     "Duplicates": "Files with identical content. The oldest copy is kept; pick a different one if you prefer. "
@@ -448,7 +450,7 @@ class App(ctk.CTk):
             anchor="w", padx=20, pady=(T.PAD_Y, T.GAP))
         self.nav = {}
         for name in NAMES + ("Settings",):
-            b = ctk.CTkButton(bar, text=name, anchor="w", font=(FONT, 15), height=40, fg_color="transparent",
+            b = ctk.CTkButton(bar, text=NAV_LABEL.get(name, name), anchor="w", font=(FONT, 15), height=40, fg_color="transparent",
                               text_color=T.TEXT_NAV, hover_color=T.SURFACE_ALT,
                               corner_radius=T.R_NAV, command=lambda n=name: self.show(n))
             if name == "Settings":  # macOS-style: settings sit apart, at the bottom
@@ -639,7 +641,7 @@ class App(ctk.CTk):
             card.grid_forget()
         for name, t in zip(NAMES[1:], self.tabs):
             t.clear("Press Scan on Home to look through this folder.")
-            self.nav[name].configure(text=name)
+            self.nav[name].configure(text=NAV_LABEL.get(name, name))
         self.status.configure(text="Folder chosen. Press Scan.")
         self.show("Home")
 
@@ -755,7 +757,8 @@ class App(ctk.CTk):
             cap.configure(text=captions[name] + ("\nNothing to clean. Nice." if not counts[name] else "\nClick to review"))
             card.grid(row=5 + i // 2, column=i % 2, sticky="ew", padx=6, pady=6)  # rows 0-4: title … Scan button
             count_up(num, counts[name])
-            self.nav[name].configure(text=f"{name}  ({counts[name]})" if counts[name] else name)
+            label = NAV_LABEL.get(name, name)
+            self.nav[name].configure(text=f"{label}  ({counts[name]})" if counts[name] else label)
         total = sum(counts.values())
         self.status.configure(text="Scan finished. Review the cards below." if total
                               else "Scan finished. This folder is already tidy.")
@@ -905,4 +908,7 @@ class App(ctk.CTk):
 
 
 def main() -> None:
-    App().mainloop()
+    app = App()
+    if len(sys.argv) > 1:  # a folder given on the command line wins over "reopen last folder"
+        app.after(0, lambda: app.set_folder(Path(sys.argv[1])))
+    app.mainloop()

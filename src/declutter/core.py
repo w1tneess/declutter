@@ -57,7 +57,7 @@ DRIVE_FIXED = 3  # GetDriveTypeW
 _HIDDEN = 0x2
 _CLOUD_ONLY = 0x1000 | 0x40000 | 0x400000  # OFFLINE | RECALL_ON_OPEN | RECALL_ON_DATA_ACCESS
 _LINK_TAGS = {0xA000000C, 0xA0000003}      # symlink, junction (mount point)
-_PARTIAL = 64 * 1024                       # bytes hashed in the cheap first pass
+_PARTIAL = 64 * 1024                       # bytes hashed at each end in the cheap first pass
 _CHUNK = 1024 * 1024
 
 ProgressFn = Optional[Callable[[str], None]]
@@ -410,20 +410,24 @@ class DupGroup:
 
 
 def _hash(path: Path, limit: int | None, cancel: CancelFn) -> str | None:
-    """SHA-256 of the first `limit` bytes (all if None). None on error or cancel."""
+    """SHA-256 of the whole file (limit None), or of its first and last `limit` bytes,
+    which is the whole file when it is at most 2 * limit long. None on error or cancel."""
     h = hashlib.sha256()
-    left = limit
     try:
         with open(path, "rb") as f:
-            while left is None or left > 0:
+            if limit is not None:
+                head = f.read(limit)
+                f.seek(max(len(head), os.fstat(f.fileno()).st_size - limit))
+                h.update(head)
+                h.update(f.read(limit))
+                return h.hexdigest()
+            while True:
                 if cancel and cancel():
                     return None
-                block = f.read(_CHUNK if left is None else min(_CHUNK, left))
+                block = f.read(_CHUNK)
                 if not block:
                     break
                 h.update(block)
-                if left is not None:
-                    left -= len(block)
     except OSError:
         return None
     return h.hexdigest()
@@ -438,7 +442,7 @@ def _hash_many(paths: list[Path], limit: int | None, cancel: CancelFn) -> dict[P
 
 def find_duplicates(root: str | Path, min_size: int = 1, progress: ProgressFn = None,
                     cancel: CancelFn = None, entries: list[Entry] | None = None) -> list[DupGroup]:
-    """Group by size, then first 64 KB, then full SHA-256. Cloud-only files are never read."""
+    """Group by size, then first + last 64 KB, then full SHA-256. Cloud-only files are never read."""
     root = require_root(root)
     if entries is None:
         entries = list(walk_files(root, cancel=cancel))
@@ -460,14 +464,14 @@ def find_duplicates(root: str | Path, min_size: int = 1, progress: ProgressFn = 
                 by_first[(size, first[p])].append(p)
     by_first = {k: v for k, v in by_first.items() if len(v) > 1}
 
-    big = [p for (size, _), fs in by_first.items() if size > _PARTIAL for p in fs]
+    big = [p for (size, _), fs in by_first.items() if size > 2 * _PARTIAL for p in fs]
     if progress and big:
         progress(f"Checking {len(big)} possible duplicates in full…")
     full = _hash_many(big, None, cancel)
 
     groups: list[DupGroup] = []
     for (size, fh), fs in by_first.items():
-        if size <= _PARTIAL:  # the first pass already covered the whole file
+        if size <= 2 * _PARTIAL:  # the ends pass already covered the whole file
             buckets = {fh: fs}
         else:
             buckets = defaultdict(list)

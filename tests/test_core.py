@@ -247,12 +247,32 @@ def test_shared_entries_match_separate_walks(root):
 
 
 def test_big_duplicates_use_full_hash(root):
-    head = b"h" * (70 * 1024)  # identical first 64 KB, different tail
-    touch(root / "a.bin", head + b"A" * 100)
-    touch(root / "b.bin", head + b"B" * 100)
-    touch(root / "c.bin", head + b"A" * 100)
+    end = b"h" * (70 * 1024)  # identical first and last 64 KB; only the middle differs
+    touch(root / "a.bin", end + b"A" * 100 + end)
+    touch(root / "b.bin", end + b"B" * 100 + end)
+    touch(root / "c.bin", end + b"A" * 100 + end)
     groups = core.find_duplicates(root)
     assert len(groups) == 1 and {p.name for p in groups[0].files} == {"a.bin", "c.bin"}
+
+
+def test_prefilter_uses_first_and_last_64kb(root, monkeypatch):
+    head = b"h" * (200 * 1024)  # same size and first 64 KB; only the tail differs
+    touch(root / "a.bin", head + b"A")
+    touch(root / "b.bin", head + b"B")
+    full = []
+    real = core._hash
+    monkeypatch.setattr(core, "_hash", lambda p, limit, cancel: (full.append(p) if limit is None else None)
+                        or real(p, limit, cancel))
+    assert core.find_duplicates(root) == []
+    assert full == [], "files that differ in the last 64 KB must never need a full hash"
+
+
+def test_ends_hash_covers_small_files_whole(root):
+    # up to 128 KB the ends overlap, so the cheap pass alone must decide; a middle byte differs here
+    a = touch(root / "a.bin", b"x" * 64 * 1024 + b"A" + b"y" * 60 * 1024)
+    b = touch(root / "b.bin", b"x" * 64 * 1024 + b"B" + b"y" * 60 * 1024)
+    assert core._hash(a, core._PARTIAL, None) != core._hash(b, core._PARTIAL, None)
+    assert core.find_duplicates(root) == []
 
 
 def test_apply_moves_refuses_outside_root(root, tmp_path):

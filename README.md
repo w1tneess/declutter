@@ -18,7 +18,8 @@ Uninstall from Windows Settings > Apps. Website source is in `website/` (deploye
 - **Empty folders**: finds folders with no files at any depth.
 - **Filter by name** on each list. Only the rows you can see count as selected, so nothing hidden is ever removed.
 - **Double-click** a file or folder to see it in Explorer (it is never opened).
-- **Settings**: theme (System, Light, Dark), reopen the last folder at start, and the Large & old filters, all remembered.
+- **Settings**: theme (System, Light, Dark), reopen the last folder at start, the Large & old filters, and a "Never touch" list of pinned files and folders, all remembered.
+- **Right-click a folder > Tidy with Declutter** (optional when installing) opens the app on that folder. `Declutter.exe <folder>` does the same.
 
 ![Duplicates, light theme](site/screenshot-duplicates.png)
 ![Large & old files, dark theme](site/screenshot-dark.png)

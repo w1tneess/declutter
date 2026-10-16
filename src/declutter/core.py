@@ -51,7 +51,7 @@ PROJECT_MARKERS = {".git", "node_modules", ".venv", "package.json"}  # plus any 
 PARTIAL_EXTS = {".crdownload", ".part", ".tmp", ".download", ".opdownload", ".!qb"}
 DEAD_EXTS = {".crdownload", ".part"}  # these, once older than DEAD_SECS, are offered as dead downloads
 DEAD_SECS = 3 * 86400
-SKIP_SORT_EXTS = {".lnk", ".url", ".ini"}  # shortcuts and config files are never moved
+SKIP_SORT_EXTS = {".lnk", ".url", ".ini"}  # shortcuts and config files are never moved or listed as copies
 RECENT_SECS = 5 * 60
 RECENT_HOURS_DEFAULT, RECENT_HOURS_MAX = 24, 72
 INSTALLER_EXTS, INSTALLER_SECS = {".exe", ".msi", ".iso"}, 7 * 86400
@@ -546,7 +546,8 @@ def find_duplicates(root: str | Path, min_size: int = 1, progress: ProgressFn = 
     mtime: dict[Path, float] = {}
     by_size: dict[int, list[Path]] = defaultdict(list)
     for p, st in entries:
-        if st.st_size >= min_size and not _attrs(st) & _CLOUD_ONLY and p.suffix.lower() not in DEAD_EXTS:
+        if (st.st_size >= min_size and not _attrs(st) & _CLOUD_ONLY
+                and p.suffix.lower() not in DEAD_EXTS | SKIP_SORT_EXTS):
             by_size[st.st_size].append(p)
             mtime[p] = st.st_mtime
     sized = {s: fs for s, fs in by_size.items() if len(fs) > 1}
@@ -638,7 +639,7 @@ def find_redownloads(root: str | Path, entries: list[Entry] | None = None, cance
     out: list[Redownload] = []
     for p, st in entries:
         m = _COPY_NAME.fullmatch(p.stem)
-        if not m or p in skip or not st.st_size:
+        if not m or p in skip or not st.st_size or p.suffix.lower() in SKIP_SORT_EXTS:
             continue
         orig = by_name.get((p.parent, p.suffix.lower(), m["base"].lower()))
         if orig and orig[1].st_size and abs(st.st_size - orig[1].st_size) <= 0.02 * orig[1].st_size:

@@ -22,7 +22,7 @@ A modern, easy-to-use Windows desktop app that declutters a messy folder safely.
 | Feature | Behaviour |
 |---|---|
 | Sort by type | Top-level loose files only (no recursion) go to Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Name collisions get ` (1)`. Screenshots and chat pictures go to `Images/Screenshots` and `Images/Chat` (one level). `.lnk`, `.url`, `.ini` are never moved. Files last touched (later of modified and created time) within N hours, default 24, setting 0 to 72, are left alone. |
-| Duplicates | Group by size, then first + last 64 KB, then SHA-256. Oldest-modified copy is the suggested keeper. User can change the keeper per group. A separate, never-preselected "Possible re-downloads" section lists `name (1).ext` / `name - Copy.ext` siblings within 2 % size; the original always stays. |
+| Duplicates | Group by size, then first + last 64 KB, then SHA-256. `.lnk`, `.url`, `.ini` are never listed, here or as re-downloads. Oldest-modified copy is the suggested keeper. User can change the keeper per group. A separate, never-preselected "Possible re-downloads" section lists `name (1).ext` / `name - Copy.ext` siblings within 2 % size; the original always stays. |
 | Large and old | Filters: min size (MB) and older than (days). Both must match; 0 disables a filter. Sorted by size, largest first. A "Likely leftovers" group (never "safe", never preselected): zips fully extracted into a same-named sibling folder, installers over 7 days old in the Downloads known folder, `.crdownload` / `.part` over 3 days old. |
 | Empty folders | Folders with no files at any depth (`desktop.ini` and `Thumbs.db` don't count). Delete deepest first; the whole folder goes to the Recycle Bin. |
 

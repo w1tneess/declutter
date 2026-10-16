@@ -211,7 +211,8 @@ app.sort.update_selection()
 assert app.sort.action_btn.cget("text") == "Sort 1 file"
 app.sort.select_all(True)
 assert not app.undo_bar.winfo_manager(), "no undo banner before any sort"
-real_confirm, A.confirm = A.confirm, lambda *a: True
+undo_asked = []
+real_confirm, A.confirm = A.confirm, lambda *a: undo_asked.append(a) or True
 app.show("Sort")
 app.move()
 pump(lambda: not app._busy)                          # the move
@@ -223,6 +224,8 @@ app.undo()
 pump(lambda: not app._busy)
 pump(lambda: not app._busy and len(app.sort.files) == 2)
 assert not app.undo_bar.winfo_manager() and (big / "huge0.bin").exists()
+msg = undo_asked[-1][2]
+assert msg.startswith(f"Undo the sort of 2 files in {big.name} (just now)?"), msg
 A.confirm = real_confirm
 print("sort + undo banner OK")
 
@@ -337,6 +340,11 @@ assert "a.lnk" not in {m.src.name for m in app.moves}
 assert [c[1].copy.name for c in app.dups.copies] == ["report (1).pdf"] and not app.dups.copies[0][0].get()
 assert app.dups.selected() == [], app.dups.selected()
 assert "possible re-download" in app.cards["Duplicates"][2].cget("text"), app.cards["Duplicates"][2].cget("text")
+labels = lambda frame: [c.cget("text") for c in frame.winfo_children() if isinstance(c, ctk.CTkLabel)]  # noqa: E731
+assert sorted(t for w, _, _ in app.large.rows for t in labels(w)) == [
+    "Old installer", "Unfinished download", "Unpacked .zip (pack)"], [labels(w) for w, _, _ in app.large.rows]
+pill = [t for w, _, _ in app.dups.rows for t in labels(w) if t.startswith("Numbered copy")]
+assert len(pill) == 1 and " vs " in pill[0], pill
 app._toggle_leftovers()
 assert names(app.large) == ["dead.crdownload", "pack.zip", "setup.exe"]
 app._toggle_leftovers()
@@ -348,8 +356,11 @@ settle(300)
 shoot("redownloads")
 app.dups.select_all(True)
 assert app.dups.selected() == [], "Select all must not tick possible re-downloads"
+assert app.dups.sel_label.cget("text") == "Selected to reclaim: 0 B", app.dups.sel_label.cget("text")
 app.dups.copies[0][0].set(True)
 app.dups.update_selection()
+assert app.dups.sel_label.cget("text").startswith("Selected to reclaim: ") and \
+    app.dups.sel_label.cget("text").endswith("· 1 item"), app.dups.sel_label.cget("text")
 app.remove_dups()
 pump(lambda: not app._busy)
 assert asked[-1][3] == "Send 1 item" and sent == [os.path.abspath(small / "docs" / "report (1).pdf")], (asked[-1], sent)
@@ -357,6 +368,8 @@ app.show("Large & Old")
 app.scan()
 pump(lambda: not app._busy and app.entries is not None)
 app.large.select_all(True)
+assert app.large.sel_label.cget("text").startswith("Selected to reclaim: ") and \
+    app.large.sel_label.cget("text").endswith("· 3 items"), app.large.sel_label.cget("text")
 app.large.action_btn.invoke()
 pump(lambda: not app._busy)
 assert asked[-1][3] == "Send 3 items" and len(sent) == 4, (asked[-1], sent)

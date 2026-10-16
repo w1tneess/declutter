@@ -11,7 +11,7 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - [ ] Duplicates must not list .lnk, .url or .ini files (identical config files in different folders are not redundant). Test: a folder with two identical a.ini files and two identical b.txt files lists only b.txt.
 - [ ] Tag v0.2.0, then install that exact Release file on a clean Windows machine (Windows Sandbox or a VM). Not a local build.
 
-## R1. Trust cues (cheap, high value)
+## R1. Trust cues (cheap, high value) - built, awaiting review
 - "Why flagged" pill next to each row in Large & old and Duplicates: Unpacked .zip (show the matching folder name), Old installer, Unfinished download, Numbered copy. For re-downloads show the real size difference ("2.0 MB vs 2.1 MB"), not a rounded percentage.
 - Live "Selected to reclaim: X" next to the main action button in Duplicates and Large & old.
 - core.peek_undo() returns folder, file count and age of the last sort. The Undo confirmation says: "Undo the sort of 14 files in Downloads (5 minutes ago)?" Test peek_undo headless.

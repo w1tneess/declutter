@@ -55,7 +55,7 @@ SKIP_SORT_EXTS = {".lnk", ".url", ".ini"}  # shortcuts and config files are neve
 RECENT_SECS = 5 * 60
 RECENT_HOURS_DEFAULT, RECENT_HOURS_MAX = 24, 72
 INSTALLER_EXTS, INSTALLER_SECS = {".exe", ".msi", ".iso"}, 7 * 86400
-EXTRACTED, OLD_INSTALLER, DEAD_DOWNLOAD = "Already extracted", "Old installer", "Dead download"
+EXTRACTED, OLD_INSTALLER, DEAD_DOWNLOAD = "Unpacked .zip", "Old installer", "Unfinished download"
 SUB_BUCKETS = {  # one level under Images; matched on the file name (without extension)
     "Screenshots": re.compile(r"(screenshot|snip|capture)", re.I),
     "Chat": re.compile(r"(IMG-\d{8}-WA\d+|WhatsApp Image)", re.I),
@@ -84,6 +84,20 @@ Entry = tuple[Path, os.stat_result]
 
 
 # ---------- helpers ----------
+
+def size_pair(a: int, b: int) -> str:
+    """'2.0 MB vs 2.1 MB'; exact bytes when rounding would make two different sizes look equal."""
+    x, y = human_size(a), human_size(b)
+    return f"{x} vs {y}" if x != y else f"{a:,} B vs {b:,} B"
+
+
+def ago(seconds: float) -> str:
+    for size, unit in ((86400, "day"), (3600, "hour"), (60, "minute")):
+        if seconds >= size:
+            n = int(seconds // size)
+            return f"{n} {unit}{'' if n == 1 else 's'} ago"
+    return "just now"
+
 
 def human_size(n: float) -> str:
     for unit in ("B", "KB", "MB", "GB", "TB"):
@@ -458,6 +472,27 @@ def undo_count() -> int:
     """Number of moves in the batch "Undo last sort" would reverse."""
     batches = _read_log()
     return len(batches[-1].get("moves", [])) if batches and isinstance(batches[-1], dict) else 0
+
+
+@dataclass
+class UndoInfo:
+    folder: Path
+    count: int
+    age_seconds: float | None  # None if the log has no readable time
+
+
+def peek_undo() -> UndoInfo | None:
+    """What "Undo last sort" would reverse: the folder, how many files and how long ago. Changes nothing."""
+    batches = _read_log()
+    last = batches[-1] if batches else None
+    moves = last.get("moves") if isinstance(last, dict) else None
+    if not isinstance(moves, list) or not moves or not isinstance(moves[0], dict) or "src" not in moves[0]:
+        return None
+    try:
+        age = max(0.0, time.time() - time.mktime(time.strptime(last["time"], "%Y-%m-%d %H:%M:%S")))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        age = None
+    return UndoInfo(Path(moves[0]["src"]).parent, len(moves), age)
 
 
 def _log_path_ok(p: Path) -> bool:

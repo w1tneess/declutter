@@ -19,6 +19,7 @@ from .theme import FONT
 
 SITE = "https://w1tneess.github.io/declutter/"
 REPO = "https://github.com/w1tneess/declutter"
+SUPPORT = "https://support.advaitachandra.in"
 
 GHOST = dict(fg_color="transparent", border_width=1, border_color=T.BORDER_CONTROL,
              text_color=T.TEXT_NAV, hover_color=T.SURFACE_ALT)
@@ -707,7 +708,7 @@ class App(ctk.CTk):
 
         card = group("About")
         r = row(card, f"Declutter {__version__}", "Free and open source (MIT). Your files never leave this computer.")
-        for text, url in (("Source code", REPO), ("Website", SITE)):
+        for text, url in (("Support", SUPPORT), ("Source code", REPO), ("Website", SITE)):
             ctk.CTkButton(r, text=text, width=100, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
                           command=lambda u=url: webbrowser.open(u), **PLAIN).pack(side="right", padx=(8, 0))
         return f

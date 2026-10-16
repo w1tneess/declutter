@@ -379,6 +379,58 @@ pump(lambda: not app._busy)
 assert "recent files left alone" in app.sort_hint.cget("text"), app.sort_hint.cget("text")
 assert app.sort.files == [] and app.settings is not None and A.T.load_settings()["recent_hours"] == 24
 print(f"leftovers + re-downloads + sub-buckets + grace period OK, longest UI update {worst * 1000:.0f} ms")
+
+# ---- diagnostics: operations are logged, About has two buttons, errors are logged and shown in the themed dialog
+from declutter import __version__, diag  # noqa: E402
+log = "\n".join(diag.recent_lines(500))
+for op in ("op=scan", "op=sort", "op=undo", "op=recycle"):
+    assert op in log, (op, log[-600:])
+buttons = []
+walk = lambda w: [buttons.append(w.cget("text")) if isinstance(w, ctk.CTkButton) else None] and [walk(c) for c in w.winfo_children()]  # noqa: E731
+walk(app.pages["Settings"])
+assert "Open log folder" in buttons and "Copy diagnostics" in buttons, buttons
+found = {}
+find = lambda w: [found.update({w.cget("text"): w}) if isinstance(w, ctk.CTkButton) else None] and [find(c) for c in w.winfo_children()]  # noqa: E731
+find(app.pages["Settings"])
+app.show("Settings")
+for mode in ("Light", "Dark"):
+    app._set_theme(mode)
+    settle(300)
+    app.pages["Settings"]._parent_canvas.yview_moveto(1)  # the About card is at the bottom
+    settle(300)
+    for name in ("Copy diagnostics", "Open log folder"):
+        b = found[name]
+        assert b.winfo_ismapped() and not clipped(b) and b.winfo_rooty() >= app.winfo_rooty(), (mode, name)
+    shoot(f"about_{mode}")
+opened = []
+A.os.startfile = opened.append
+app.open_logs()
+assert opened == [str(diag.log_file().parent)] and diag.log_file().parent.is_dir(), opened
+app.copy_diagnostics()
+clip = app.clipboard_get()
+assert f"Declutter {__version__}" in clip and "op=scan" in clip, clip[:300]
+alerts = []
+real_alert, A.alert = A.alert, lambda master, title, message: alerts.append((title, message))
+app._on_ui_error(ValueError, ValueError("kaboom"), None)
+assert alerts[-1][0] == "Something went wrong" and "kaboom" in alerts[-1][1] and "Open log folder" in alerts[-1][1], alerts
+assert "ValueError: kaboom" in "\n".join(diag.recent_lines(500))
+app._run(lambda: 1 / 0, lambda r: None, cancellable=False)
+pump(lambda: len(alerts) == 2)
+assert "division by zero" in alerts[-1][1] and "ZeroDivisionError" in "\n".join(diag.recent_lines(500)), alerts
+A.alert = real_alert
+A.confirm = real_confirm  # the real dialog, for the screenshots
+for mode in ("Light", "Dark"):
+    app._set_theme(mode)
+    settle(300)
+    tops = []
+    app.after(700, lambda m=mode: (shoot(f"alert_{m}", [w for w in app.winfo_children()
+                                                       if isinstance(w, ctk.CTkToplevel)][-1]),
+                                   tops.append(1),
+                                   [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)][-1]
+                                   .event_generate("<Escape>")))
+    A.alert(app, "Something went wrong", "Example error text.\n\nThe app is still running.")
+    assert tops
+print("diagnostics OK")
 app._set_theme("System")
 app.destroy()
 

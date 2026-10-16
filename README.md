@@ -50,5 +50,8 @@ With Pillow installed (`pip install pillow`) it saves screenshots to `.pytest_tm
 - Antivirus may occasionally flag PyInstaller builds.
 - Items sent to the Recycle Bin are restored from the Bin, not through the app's Undo.
 
+## Support
+Declutter is free and stays free. If it saved you time, you can [support the developer](https://support.advaitachandra.in). It is optional.
+
 ## License
 MIT

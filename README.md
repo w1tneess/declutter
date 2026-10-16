@@ -23,7 +23,7 @@ Uninstall from Windows Settings > Apps. Website source is in `website/` (deploye
 ![Duplicates, light theme](site/screenshot-duplicates.png)
 ![Large & old files, dark theme](site/screenshot-dark.png)
 
-Removals go to the Recycle Bin. Drive roots, your home folder, Windows, Program Files, AppData, `.git` and `node_modules` are refused. Symlinks, junctions and hidden files are skipped.
+Removals go to the Recycle Bin, and only on local drives (USB sticks and network drives are refused, since they may have no Bin). Drive roots, your home folder, Windows, Program Files and AppData are refused. Left alone: code projects (folders with `.git`, `node_modules`, `.venv`, `package.json` or a `.sln`), downloads in progress, files changed in the last 5 minutes, OneDrive online-only files (nothing gets downloaded), symlinks, junctions and hidden files. If one file fails (locked, too long a path), the rest still go ahead and the failures are listed.
 
 ## Run from source
 ```

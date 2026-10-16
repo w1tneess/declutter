@@ -1,11 +1,4 @@
-import pytest
-
-from declutter import theme
-
-
-@pytest.fixture(autouse=True)
-def isolated_settings(tmp_path, monkeypatch):
-    monkeypatch.setattr(theme, "_SETTINGS", tmp_path / "settings.json")
+from declutter import theme  # conftest.py isolates the settings file
 
 
 def test_save_settings_merges_keys():

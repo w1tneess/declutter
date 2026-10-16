@@ -1,5 +1,5 @@
 """GUI release checks from SPEC.md Testing: a 10,000+ file folder without freezing, cancelling a scan,
-theme switching, 100/125/150% scaling. Uses temp folders only; APPDATA is redirected.
+theme switching, 100/125/150% scaling. Uses temp folders only; APPDATA and LOCALAPPDATA are redirected.
 
 Not collected by pytest (it opens real windows). Run from the repo root:
     python tests/gui_check.py
@@ -19,6 +19,7 @@ base = Path(tempfile.mkdtemp(prefix="declutter_check_", dir=scratch))
 shots = scratch / "shots"
 shots.mkdir(exist_ok=True)
 os.environ["APPDATA"] = str(base / "appdata")
+os.environ["LOCALAPPDATA"] = str(base / "localappdata")
 sys.path.insert(0, str(repo / "src"))
 
 import _tkinter  # noqa: E402
@@ -49,7 +50,11 @@ for i in range(2):
     (big / f"huge{i}.bin").write_bytes(b"z" * (2_000_000 + i))
 for i in range(20):
     (big / "empties" / f"e{i}").mkdir(parents=True)
-n_files = sum(1 for _ in big.rglob("*") if _.is_file())
+old = time.time() - 3600  # files changed in the last 5 minutes are skipped as in use
+files = [f for f in big.rglob("*") if f.is_file()]
+for f in files:
+    os.utime(f, (old, old))
+n_files = len(files)
 print(f"made {n_files} files in {time.time() - t0:.1f}s")
 assert n_files >= 10_000
 

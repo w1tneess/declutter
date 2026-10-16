@@ -3,12 +3,17 @@
 Safety rules:
 - Nothing is ever permanently deleted: removals go to the Recycle Bin.
 - Sorting moves are logged so the last batch can be undone.
-- Drive roots, the home folder (and its parents) and system folders are refused.
+- Drive roots, the home folder (and its parents), system folders and project folders are refused.
 - Symlinks, junctions, hidden items and cloud-only placeholders are never followed or hashed.
+- Project folders (.git, node_modules, .venv, package.json, *.sln) are never entered.
+- Active downloads and files changed in the last 5 minutes are left alone.
+- Removals only happen on local fixed drives, where the Recycle Bin exists.
 - Every action re-checks the disk right before touching it, because the scan may be stale.
+- One failing item never aborts a batch: failures are collected and returned.
 """
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
@@ -33,16 +38,21 @@ CATEGORIES = {
     "Code": {".py", ".js", ".ts", ".html", ".css", ".json", ".java", ".c", ".cpp", ".cs", ".ipynb", ".sql"},
 }
 EXT_TO_CAT = {ext: cat for cat, exts in CATEGORIES.items() for ext in exts}
-CATEGORY_NAMES = set(CATEGORIES) | {"Other"}
-_CATEGORY_LOWER = {c.lower() for c in CATEGORY_NAMES}
 
 PROTECTED_DIRS = {
     "windows", "program files", "program files (x86)", "programdata",
     "$recycle.bin", "system volume information", ".git", "node_modules", "appdata",
 }
 
-LOG_DIR = Path(os.environ.get("APPDATA", Path.home() / ".config")) / "Declutter"
+PROJECT_MARKERS = {".git", "node_modules", ".venv", "package.json"}  # plus any *.sln
+PARTIAL_EXTS = {".crdownload", ".part", ".tmp", ".download", ".opdownload", ".!qb"}
+RECENT_SECS = 5 * 60
+FOLDER_JUNK = {"desktop.ini", "thumbs.db"}  # Explorer's own files; a folder holding only these is empty
+
+LOG_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".config")) / "Declutter"
 UNDO_LOG = LOG_DIR / "undo.json"
+OLD_LOG_DIR = Path(os.environ.get("APPDATA", Path.home() / ".config")) / "Declutter"  # before 0.2
+DRIVE_FIXED = 3  # GetDriveTypeW
 
 _HIDDEN = 0x2
 _CLOUD_ONLY = 0x1000 | 0x40000 | 0x400000  # OFFLINE | RECALL_ON_OPEN | RECALL_ON_DATA_ACCESS
@@ -82,6 +92,11 @@ def check_root(path: str | Path) -> tuple[bool, str]:
         return False, "That folder contains your whole profile. Pick a subfolder."
     if any(part.lower() in PROTECTED_DIRS for part in p.parts):
         return False, "System or protected folder."
+    try:
+        if is_project({n.lower() for n in os.listdir(p)}):
+            return False, "This is a project folder (it has .git, node_modules, .venv, package.json or a .sln file)."
+    except OSError as e:
+        return False, str(e)
     return True, ""
 
 
@@ -99,6 +114,29 @@ def _attrs(st: os.stat_result) -> int:
 
 def _is_link_dir(st: os.stat_result) -> bool:
     return getattr(st, "st_reparse_tag", 0) in _LINK_TAGS
+
+
+def is_project(lower_names: set[str]) -> bool:
+    """True if a folder holding these (lowercased) names is a code project."""
+    return any(n in PROJECT_MARKERS or n.endswith(".sln") for n in lower_names)
+
+
+def _leave_alone(name: str, st: os.stat_result, now: float) -> bool:
+    """Active download, changed in the last few minutes, or an online-only cloud placeholder."""
+    return (os.path.splitext(name)[1].lower() in PARTIAL_EXTS or now - st.st_mtime < RECENT_SECS
+            or bool(_attrs(st) & _CLOUD_ONLY))
+
+
+def _drive_root(p: str | Path) -> str:
+    return os.path.splitdrive(os.path.abspath(p))[0].rstrip("\\") + "\\"
+
+
+def _drive_type(p: str | Path) -> int:
+    """GetDriveTypeW; anything but a local fixed disk (USB, network, CD, RAM disk) may have no Recycle Bin."""
+    windll = getattr(ctypes, "windll", None)
+    if windll is None:
+        return DRIVE_FIXED  # shortcut: non-Windows dev runs only; the app ships for Windows
+    return windll.kernel32.GetDriveTypeW(ctypes.c_wchar_p(_drive_root(p)))
 
 
 def is_hidden(p: Path | str) -> bool:
@@ -124,35 +162,39 @@ def walk_files(root: Path, skip_dirs: set[str] | None = None,
                cancel: CancelFn = None) -> Iterator[Entry]:
     """Yield (path, stat) for regular files under root, in one pass.
 
-    Skips symlinks, junctions, hidden and protected folders. Stats come from the directory
+    Skips symlinks, junctions, hidden, protected and project folders, and files to leave alone
+    (downloads in progress, just-changed files, cloud placeholders). Stats come from the directory
     listing, so no extra syscalls are needed by callers.
     """
     skip = {d.lower() for d in (skip_dirs or ())}
     stack = [os.fspath(root)]
+    now = time.time()
     while stack:
         if cancel and cancel():
             return
         try:
-            it = os.scandir(stack.pop())
+            with os.scandir(stack.pop()) as it:
+                entries = list(it)
         except OSError:
             continue
-        with it:
-            for e in it:
-                try:
-                    if e.is_symlink():
-                        continue
-                    st = e.stat(follow_symlinks=False)
-                except OSError:
+        if is_project({e.name.lower() for e in entries}):
+            continue
+        for e in entries:
+            try:
+                if e.is_symlink():
                     continue
-                if e.name.startswith(".") or _attrs(st) & _HIDDEN:
+                st = e.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            if e.name.startswith(".") or _attrs(st) & _HIDDEN:
+                continue
+            if stat.S_ISDIR(st.st_mode):
+                low = e.name.lower()
+                if low in PROTECTED_DIRS or low in skip or _is_link_dir(st):
                     continue
-                if stat.S_ISDIR(st.st_mode):
-                    low = e.name.lower()
-                    if low in PROTECTED_DIRS or low in skip or _is_link_dir(st):
-                        continue
-                    stack.append(e.path)
-                elif stat.S_ISREG(st.st_mode):
-                    yield Path(e.path), st
+                stack.append(e.path)
+            elif stat.S_ISREG(st.st_mode) and not _leave_alone(e.name, st, now):
+                yield Path(e.path), st
 
 
 def scan_entries(root: str | Path, cancel: CancelFn = None) -> list[Entry]:
@@ -189,7 +231,13 @@ def to_recycle_bin(paths: list[Path], root: str | Path | None = None) -> tuple[i
                 errors.append(f"{p.name}: outside the chosen folder, skipped")
             elif os.path.islink(p):
                 errors.append(f"{p.name}: is a link, skipped")
-            elif p.exists():
+            elif not p.exists():
+                continue
+            elif _drive_type(p) != DRIVE_FIXED:
+                errors.append(f"{p.name}: on a removable or network drive, which may have no Recycle Bin, skipped")
+            elif p.is_file() and _leave_alone(p.name, os.lstat(p), time.time()):
+                errors.append(f"{p.name}: still downloading, just changed or online-only, skipped")
+            else:
                 send2trash(os.path.abspath(p))
                 ok += 1
         except Exception as e:  # send2trash raises several OS-specific errors
@@ -210,22 +258,16 @@ class Move:
         return self.dst.parent.name
 
 
-def plan_sort(root: str | Path, recursive: bool = False, cancel: CancelFn = None,
+def plan_sort(root: str | Path, cancel: CancelFn = None,
               entries: list[Entry] | None = None) -> list[Move]:
+    """Loose files directly in root only; subfolders are never touched."""
     root = require_root(root)
     if entries is None:
         entries = list(walk_files(root, cancel=cancel))
     moves: list[Move] = []
     taken: set[str] = set()  # destinations already planned in this batch
     for src, st in sorted(entries, key=lambda e: str(e[0])):
-        if recursive:
-            try:
-                parents = src.relative_to(root).parts[:-1]
-            except ValueError:
-                continue
-            if any(part.lower() in _CATEGORY_LOWER for part in parents):
-                continue  # already inside a type folder
-        elif src.parent != root:
+        if src.parent != root:
             continue
         cat = EXT_TO_CAT.get(src.suffix.lower(), "Other")
         dst = unique_path(root / cat / src.name, taken)
@@ -247,6 +289,9 @@ def apply_moves(moves: list[Move], root: str | Path | None = None) -> tuple[int,
             if not stat.S_ISREG(st.st_mode):
                 errors.append(f"{m.src.name}: is no longer a regular file, skipped")
                 continue
+            if _leave_alone(m.src.name, st, time.time()):
+                errors.append(f"{m.src.name}: still downloading, just changed or online-only, skipped")
+                continue
             m.dst.parent.mkdir(parents=True, exist_ok=True)
             final = unique_path(m.dst)
             shutil.move(str(m.src), str(final))
@@ -254,7 +299,10 @@ def apply_moves(moves: list[Move], root: str | Path | None = None) -> tuple[int,
         except Exception as e:
             errors.append(f"{m.src.name}: {e}")
     if done:
-        _append_log(done)
+        try:
+            _append_log(done)
+        except Exception as e:
+            errors.append(f"The undo log could not be saved ({e}), so this sort cannot be undone from the app.")
     return len(done), errors
 
 
@@ -274,7 +322,18 @@ def _append_log(done: list[Move]) -> None:
     _write_log(batches[-20:])
 
 
+def migrate(old: Path, new: Path) -> None:
+    """Move a data file from its pre-0.2 %APPDATA% home once; if that fails it just stays there."""
+    if old != new and old.is_file() and not new.exists():
+        try:
+            new.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(old), str(new))
+        except OSError:
+            pass
+
+
 def _read_log() -> list[dict]:
+    migrate(OLD_LOG_DIR / UNDO_LOG.name, UNDO_LOG)
     try:
         data = json.loads(UNDO_LOG.read_text(encoding="utf-8"))
         return data if isinstance(data, list) else []
@@ -419,15 +478,18 @@ def trash_duplicates(removals: list[tuple[DupGroup, list[Path]]],
     """Recycle the chosen copies, but only where a kept copy still exists on disk right now."""
     ok, errors = 0, []
     for group, remove in removals:
-        gone = set(remove)
-        keepers = [f for f in group.files if f not in gone and f.is_file()
-                   and not os.path.islink(f) and f.stat().st_size == group.size]
-        if not keepers:
-            errors.append(f"{group.files[0].name}: no intact copy would remain, skipped")
-            continue
-        n, errs = to_recycle_bin(remove, root)
-        ok += n
-        errors += errs
+        try:
+            gone = set(remove)
+            keepers = [f for f in group.files if f not in gone and f.is_file()
+                       and not os.path.islink(f) and f.stat().st_size == group.size]
+            if not keepers:
+                errors.append(f"{group.files[0].name}: no intact copy would remain, skipped")
+                continue
+            n, errs = to_recycle_bin(remove, root)
+            ok += n
+            errors += errs
+        except Exception as e:
+            errors.append(f"{group.files[0].name}: {e}")
     return ok, errors
 
 
@@ -462,8 +524,9 @@ def find_large_old(root: str | Path, min_mb: float = 100, older_days: int = 0,
 
 def find_empty_dirs(root: str | Path, cancel: CancelFn = None) -> list[Path]:
     """Folders containing no files, directly or in any subfolder. Root itself excluded.
+    desktop.ini and Thumbs.db do not count as files.
 
-    Hidden, protected and linked folders are never reported and count as content,
+    Hidden, protected, linked and project folders are never reported and count as content,
     so their parents are never reported either.
     """
     root = require_root(root)
@@ -474,21 +537,25 @@ def find_empty_dirs(root: str | Path, cancel: CancelFn = None) -> list[Path]:
         if cancel and cancel():
             return False
         try:
-            it = os.scandir(d)
+            with os.scandir(d) as it:
+                entries = list(it)
         except OSError:
             return False
+        if is_project({e.name.lower() for e in entries}):
+            return False
         is_empty = True
-        with it:
-            for e in it:
-                try:
-                    st = e.stat(follow_symlinks=False)
-                    plain_dir = (stat.S_ISDIR(st.st_mode) and not e.is_symlink() and not _is_link_dir(st)
-                                 and not e.name.startswith(".") and not _attrs(st) & _HIDDEN
-                                 and e.name.lower() not in PROTECTED_DIRS)
-                except OSError:
-                    plain_dir = False
-                if not plain_dir or not visit(e.path):
-                    is_empty = False
+        for e in entries:
+            try:
+                st = e.stat(follow_symlinks=False)
+                if stat.S_ISREG(st.st_mode) and e.name.lower() in FOLDER_JUNK:
+                    continue
+                plain_dir = (stat.S_ISDIR(st.st_mode) and not e.is_symlink() and not _is_link_dir(st)
+                             and not e.name.startswith(".") and not _attrs(st) & _HIDDEN
+                             and e.name.lower() not in PROTECTED_DIRS)
+            except OSError:
+                plain_dir = False
+            if not plain_dir or not visit(e.path):
+                is_empty = False
         if is_empty and d != root_s:
             empty.append(Path(d))
         return is_empty
@@ -497,20 +564,27 @@ def find_empty_dirs(root: str | Path, cancel: CancelFn = None) -> list[Path]:
     return sorted(empty, key=lambda p: len(str(p)), reverse=True)  # deepest first
 
 
-def _has_files(d: Path) -> bool:
-    return any(names for _, _, names in os.walk(d))
+def _still_empty(d: Path) -> bool:
+    for _, dirs, files in os.walk(d):
+        if is_project({n.lower() for n in dirs + files}) or any(f.lower() not in FOLDER_JUNK for f in files):
+            return False
+    return True
 
 
 def trash_empty_dirs(paths: list[Path], root: str | Path) -> tuple[int, list[str]]:
-    """Recycle folders, re-checking each is still empty (a file may have arrived since the scan)."""
+    """Recycle folders, re-checking each is still empty (a file may have arrived since the scan).
+    A folder holding only desktop.ini / Thumbs.db goes to the Bin whole, those files included."""
     ok, errors = 0, []
     for p in paths:
-        if not p.exists():
-            continue  # a parent was already removed
-        if _has_files(p):
-            errors.append(f"{p.name}: now contains files, skipped")
-            continue
-        n, errs = to_recycle_bin([p], root)
-        ok += n
-        errors += errs
+        try:
+            if not p.exists():
+                continue  # a parent was already removed
+            if not _still_empty(p):
+                errors.append(f"{p.name}: now contains files or is a project folder, skipped")
+                continue
+            n, errs = to_recycle_bin([p], root)
+            ok += n
+            errors += errs
+        except Exception as e:
+            errors.append(f"{p.name}: {e}")
     return ok, errors

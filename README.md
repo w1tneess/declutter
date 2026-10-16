@@ -9,7 +9,7 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 2. Run the installer. It installs for your account only, so no admin rights are needed.
 3. The app is not code-signed yet, so Windows SmartScreen may say "Windows protected your PC" (Unknown publisher). Click **More info**, then **Run anyway**.
 
-Uninstall from Windows Settings > Apps. Website: https://w1tneess.github.io/declutter/ (source in `site/`, published by `.github/workflows/pages.yml`).
+Uninstall from Windows Settings > Apps. Website source is in `website/` (deployed with Vercel, see `vercel.json`).
 
 ## What it does
 - **Sort by type**: moves loose files into Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Undo supported.

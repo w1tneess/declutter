@@ -35,7 +35,7 @@ def names(root):
 
 @pytest.mark.parametrize("name", ["a.crdownload", "b.part", "c.tmp", "d.download", "e.opdownload", "f.!qB"])
 def test_partial_downloads_skipped(root, name):
-    touch(root / name, age_days=3)
+    touch(root / name, age_days=2)  # .crdownload / .part older than 3 days count as dead: see test_cleanup_rules
     touch(root / "ok.txt")
     assert names(root) == ["ok.txt"]
     assert [m.src.name for m in core.plan_sort(root)] == ["ok.txt"]

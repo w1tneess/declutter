@@ -6,6 +6,7 @@ import queue
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -35,11 +36,7 @@ HELP = {
                    "Double-click a file to see it in Explorer.",
     "Empty Folders": "Folders with no files inside, however deep. Double-click one to see it in Explorer.",
 }
-_KNOWN = {  # Windows Known Folder IDs, so OneDrive-redirected folders resolve correctly
-    "Downloads": "{374DE290-123F-4565-9164-39C4925E467B}",
-    "Desktop": "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
-    "Documents": "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}",
-}
+SORT_HINT = "Only loose files directly in this folder are sorted. Shortcuts and config files stay."
 
 
 def file_size(p: Path) -> int:
@@ -53,21 +50,8 @@ def plural(n: int, word: str) -> str:
     return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
 
-def known_folder(name: str) -> Path:
-    """Real location of Downloads/Desktop/Documents; falls back to ~/<name>."""
-    try:
-        import ctypes
-        import uuid
-        guid = uuid.UUID(_KNOWN[name])
-        g = (ctypes.c_byte * 16).from_buffer_copy(guid.bytes_le)
-        out = ctypes.c_wchar_p()
-        if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(g), 0, None, ctypes.byref(out)) == 0:
-            path = Path(out.value)
-            ctypes.windll.ole32.CoTaskMemFree(out)
-            return path
-    except Exception:
-        pass
-    return Path.home() / name
+def date_text(ts: float) -> str:
+    return time.strftime("%d %b %Y", time.localtime(ts))
 
 
 def set_primary(btn, on: bool) -> None:
@@ -335,6 +319,11 @@ class Tab(ctk.CTkFrame):
 
         def make(row) -> None:
             text, obj = row
+            if obj is None:  # a heading: a row like the others (so filtering keeps the order), never selectable
+                self.items.append((ctk.BooleanVar(value=False), None))
+                self._add_row(ctk.CTkLabel(self.list, text=text, font=(FONT, 14, "bold"), text_color=T.TEXT,
+                                           anchor="w"), "", fill="x", padx=12, pady=(10, 2))
+                return
             v = ctk.BooleanVar(value=checked)
             self.items.append((v, obj))
             cb = ctk.CTkCheckBox(self.list, text=text, variable=v, font=(FONT, 15), text_color=T.TEXT,
@@ -353,7 +342,7 @@ class Tab(ctk.CTkFrame):
         self.update_selection()
 
     def selected(self) -> list:
-        return [o for (v, o), shown in zip(self.items, self._shown()) if shown and v.get()]
+        return [o for (v, o), shown in zip(self.items, self._shown()) if shown and v.get() and o is not None]
 
     def update_selection(self) -> None:
         sel = self.selected()
@@ -371,15 +360,17 @@ class DupTab(Tab):
 
     def __init__(self, master, on_action, size_of):
         self.groups: list[tuple[ctk.BooleanVar, ctk.IntVar, core.DupGroup]] = []
+        self.copies: list[tuple[ctk.BooleanVar, core.Redownload, int]] = []  # (ticked, pair, index in self.rows)
         super().__init__(master, "Duplicates", "Send to Recycle Bin", on_action, size_of=size_of,
                          subtitle=HELP["Duplicates"])
 
     def _reset(self) -> None:
         self.groups = []
+        self.copies = []
         super()._reset()
 
-    def set_groups(self, groups: list[core.DupGroup], base: Path) -> None:
-        if not groups:
+    def set_groups(self, groups: list[core.DupGroup], base: Path, redownloads: list[core.Redownload] = ()) -> None:
+        if not groups and not redownloads:
             return self.clear("Nothing to clean. Nice.")
         self._reset()
         cap = MAX_ROWS["Duplicates"]
@@ -387,7 +378,33 @@ class DupTab(Tab):
             ctk.CTkLabel(self.list, text=f"Showing the {cap} groups that free the most space.",
                          font=(FONT, 13), text_color=T.TEXT_MUTED).pack(anchor="w", padx=12, pady=4)
 
-        def make(g: core.DupGroup) -> None:
+        def make_copy(r: core.Redownload) -> None:
+            box = ctk.CTkFrame(self.list, corner_radius=T.R_BUTTON, fg_color=T.SURFACE_ALT)
+            v = ctk.BooleanVar(value=False)  # never preselected
+            self.copies.append((v, r, len(self.rows)))
+            try:
+                where = str(r.copy.parent.relative_to(base))
+            except ValueError:
+                where = str(r.copy.parent)
+            ctk.CTkCheckBox(box, text=f"{r.copy.name}" + ("" if where == "." else f"   in {where}"), variable=v,
+                            font=(FONT, 14, "bold"), text_color=T.TEXT, fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER,
+                            border_color=T.BORDER_CONTROL, checkmark_color=T.ON_ACCENT,
+                            command=self.update_selection).pack(anchor="w", padx=10, pady=(8, 2))
+            cols = ctk.CTkFrame(box, fg_color="transparent")  # the two files side by side
+            cols.pack(anchor="w", padx=34, pady=(0, 8))
+            for text in (f"This copy: {core.human_size(r.copy_size)} · {date_text(r.copy_mtime)}",
+                         f"Original (stays): {r.original.name} · {core.human_size(r.orig_size)} · "
+                         f"{date_text(r.orig_mtime)}"):
+                ctk.CTkLabel(cols, text=text, font=(FONT, 13), text_color=T.TEXT_MUTED).pack(side="left", padx=(0, 28))
+            self._add_row(box, f"{r.copy.name} {r.original.name}", fill="x", padx=6, pady=6)
+
+        def make(g) -> None:
+            if isinstance(g, core.Redownload):
+                return make_copy(g)
+            if isinstance(g, str):  # section heading
+                return self._add_row(ctk.CTkLabel(
+                    self.list, text=g, font=(FONT, 13), text_color=T.TEXT_MUTED, anchor="w", justify="left",
+                    wraplength=620), "possible re-downloads", fill="x", padx=12, pady=(14, 4))
             box = ctk.CTkFrame(self.list, corner_radius=T.R_BUTTON, fg_color=T.SURFACE_ALT)
             inc, keeper = ctk.BooleanVar(value=True), ctk.IntVar(value=0)
             self.groups.append((inc, keeper, g))
@@ -420,19 +437,31 @@ class DupTab(Tab):
             relabel()
             self._add_row(box, " ".join(f.name for f in g.files), fill="x", padx=6, pady=6)
 
-        self._build_chunked(groups[:cap], make, chunk=4)
+        redl = ([f"Possible re-downloads: {len(redownloads)}. Same folder and type, named like a copy, almost the "
+                 "same size, but not identical. Nothing is selected: look at each pair. The original always stays."]
+                + list(redownloads)) if redownloads else []
+        self._build_chunked(list(groups[:cap]) + redl, make, chunk=4)
 
     def visible_groups(self) -> list[tuple[ctk.BooleanVar, ctk.IntVar, core.DupGroup]]:
         return [grp for grp, shown in zip(self.groups, self._shown()) if shown]
 
+    def visible_copies(self) -> list[core.Redownload]:
+        shown = self._shown()
+        return [r for v, r, i in self.copies if v.get() and shown[i]]
+
     def select_all(self, on: bool) -> None:
         for inc, _, _ in self.visible_groups():
             inc.set(on)
+        if not on:  # "Select all" covers exact duplicates only; re-downloads are ticked one by one
+            shown = self._shown()
+            for v, _, i in self.copies:
+                if shown[i]:
+                    v.set(False)
         self.update_selection()
 
     def selected(self) -> list[Path]:
         return [f for inc, keep, g in self.visible_groups() if inc.get()
-                for i, f in enumerate(g.files) if i != keep.get()]
+                for i, f in enumerate(g.files) if i != keep.get()] + [r.copy for r in self.visible_copies()]
 
 
 class SortTab(Tab):
@@ -522,6 +551,10 @@ class App(ctk.CTk):
         self.settings = T.load_settings()
         pins = self.settings.get("pins")  # "never touch" files and folders; the file is user-editable
         self.pins: list[str] = [p for p in pins if isinstance(p, str)] if isinstance(pins, list) else []
+        self._recent = core.recent_hours_setting(self.settings.get("recent_hours"))
+        self.recent_text = ctk.StringVar(value=str(self._recent))
+        self.leftovers: list[core.Leftover] = []
+        self._large: list[core.FileInfo] = []
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -737,7 +770,7 @@ class App(ctk.CTk):
         row.grid(columnspan=2, sticky="w", pady=T.GAP)
         for label in ("Downloads", "Desktop", "Documents"):
             ctk.CTkButton(row, text=label, font=(FONT, 15), corner_radius=T.R_BUTTON, width=120, height=40,
-                          command=lambda l=label: self.set_folder(known_folder(l)), **GHOST
+                          command=lambda l=label: self.set_folder(core.known_folder(l)), **GHOST
                           ).pack(side="left", padx=(0, 10))
         ctk.CTkButton(row, text="Choose folder…", font=(FONT, 15), corner_radius=T.R_BUTTON, width=140, height=40,
                       command=self.choose_folder, **GHOST).pack(side="left")
@@ -765,9 +798,19 @@ class App(ctk.CTk):
         return f
 
     def _build_sort_header(self) -> None:
-        self.sort_hint = ctk.CTkLabel(self.sort.head, text="Only loose files directly in this folder are sorted.",
-                                      font=(FONT, 13.5), text_color=T.TEXT_MUTED)
+        self.sort_hint = ctk.CTkLabel(self.sort.head, text=SORT_HINT, font=(FONT, 13.5), text_color=T.TEXT_MUTED)
         self.sort_hint.pack(anchor="w")
+        grace = ctk.CTkFrame(self.sort.head, fg_color="transparent")
+        grace.pack(anchor="w", pady=(6, 0))
+        ctk.CTkLabel(grace, text="Leave files touched in the last", font=(FONT, 14), text_color=T.TEXT).pack(
+            side="left", padx=(0, 6))
+        e = ctk.CTkEntry(grace, textvariable=self.recent_text, width=56, fg_color=T.SURFACE, text_color=T.TEXT,
+                         border_color=T.BORDER_CONTROL, corner_radius=T.R_BUTTON)
+        e.pack(side="left", padx=(0, 6))
+        e.bind("<Return>", lambda _e: self._set_recent())
+        e.bind("<FocusOut>", lambda _e: self._set_recent())
+        ctk.CTkLabel(grace, text="hours alone (0 to 72, 0 turns it off)", font=(FONT, 13),
+                     text_color=T.TEXT_MUTED).pack(side="left")
         # "Undo last sort" banner: shown while the undo log has a batch, also after a restart
         self.undo_bar = ctk.CTkFrame(self.sort.head, corner_radius=T.R_BUTTON, fg_color=T.ACCENT_SOFT)
         self.undo_text = ctk.CTkLabel(self.undo_bar, text="", font=(FONT, 14), text_color=T.TEXT)
@@ -791,18 +834,34 @@ class App(ctk.CTk):
         self.large_hint.pack(side="left")
         ctk.CTkButton(self.large.head, text="Apply", width=80, height=38, corner_radius=T.R_BUTTON,
                       font=(FONT, 14), command=self.refilter, **GHOST).pack(side="right")
-        self.installers = False
-        self.pill = ctk.CTkButton(self.large.head, text="Old installers", width=120, height=34,
-                                  corner_radius=T.R_PILL, font=(FONT, 14), command=self._toggle_installers, **GHOST)
+        self.leftovers_only = False
+        self.pill = ctk.CTkButton(self.large.head, text="Likely leftovers only", width=150, height=34,
+                                  corner_radius=T.R_PILL, font=(FONT, 14), command=self._toggle_leftovers, **GHOST)
         self.pill.pack(side="right", padx=(0, 10))
 
-    def _toggle_installers(self) -> None:
-        on = self.installers = not self.installers
+    def _toggle_leftovers(self) -> None:
+        on = self.leftovers_only = not self.leftovers_only
         self.pill.configure(fg_color=T.ACCENT_SOFT if on else "transparent",
                             text_color=T.ACCENT_TEXT if on else T.TEXT_NAV,
                             border_color=T.ACCENT_TEXT if on else T.BORDER_CONTROL)
-        self.large_hint.configure(text="Installers untouched for 30+ days, any size" if on else "0 turns a filter off")
-        self.refilter()
+        self.large_hint.configure(text="Extracted zips, installers over 7 days old in Downloads, dead downloads"
+                                  if on else "0 turns a filter off")
+        self._fill_large()
+
+    def _set_recent(self) -> None:
+        n = core.recent_hours_setting(self.recent_text.get().strip(), default=self._recent)
+        self.recent_text.set(str(n))
+        if n != self._recent:
+            self._recent = n
+            T.save_settings(recent_hours=n)
+            self._replan()
+
+    def _replan(self) -> None:
+        """Re-plan the sort from the last scan (no new walk), e.g. after the grace period changed."""
+        if not self.folder or self.entries is None:
+            return
+        folder, c, entries, hours = self.folder, self._cancel.is_set, self.entries, self._recent
+        self._run(lambda: core.plan_sort(folder, cancel=c, entries=entries, recent_hours=hours), self._fill_sort)
 
     # ---------- folder + background work ----------
 
@@ -820,7 +879,8 @@ class App(ctk.CTk):
             return
         # core returns paths under the resolved folder, so keep the same form to make relative paths work
         self.folder = p.resolve()
-        self.entries = None
+        self.entries, self.leftovers, self._large = None, [], []
+        self.sort_hint.configure(text=SORT_HINT)
         T.save_settings(last_folder=str(self.folder))
         self.folder_label.configure(text=f"Folder: {self.folder}")
         set_primary(self.scan_btn, True)
@@ -898,14 +958,6 @@ class App(ctk.CTk):
         T.save_settings(min_mb=self.min_mb.get(), older_days=self.older.get())
         return mb, days
 
-    def _large_query(self) -> dict | None:
-        params = self._large_params()
-        if params is None:
-            return None
-        if self.installers:  # "Old installers" pill: any size, untouched for 30+ days
-            return dict(min_mb=0, older_days=30, exts=core.CATEGORIES["Installers"])
-        return dict(min_mb=params[0], older_days=params[1])
-
     def _save_filters(self) -> None:
         """Settings page: remember valid values quietly; invalid ones are reported when used."""
         try:
@@ -915,40 +967,48 @@ class App(ctk.CTk):
             pass
 
     def scan(self) -> None:
-        query = self._large_query()
-        if not self.folder or not query:
+        params = self._large_params()
+        if not self.folder or not params:
             return
-        folder, c, p, pins = self.folder, self._cancel.is_set, self._progress, list(self.pins)
+        folder, c, p, pins, hours = self.folder, self._cancel.is_set, self._progress, list(self.pins), self._recent
 
         def work():
             p("Reading the folder…")
             entries = core.scan_entries(folder, cancel=c, ignore=pins)  # one walk shared by all checks
-            moves = core.plan_sort(folder, cancel=c, entries=entries)
+            moves = core.plan_sort(folder, cancel=c, entries=entries, recent_hours=hours)
             dups = core.find_duplicates(folder, progress=p, cancel=c, entries=entries)
-            large = core.find_large_old(folder, cancel=c, entries=entries, **query)
+            large = core.find_large_old(folder, *params, cancel=c, entries=entries)
+            p("Looking for leftovers…")
+            left = core.find_leftovers(folder, entries=entries, cancel=c)
+            redl = core.find_redownloads(folder, entries=entries, cancel=c,
+                                         exclude={f for g in dups for f in g.files})
             p("Looking for empty folders…")
-            return entries, moves, dups, large, core.find_empty_dirs(folder, cancel=c, ignore=pins)
+            return entries, moves, dups, large, left, redl, core.find_empty_dirs(folder, cancel=c, ignore=pins)
 
         self.status.configure(text="Scanning…")
         self._run(work, self._scan_done)
 
     def _scan_done(self, r) -> None:
-        self.entries, moves, dups, large, empty = r
+        self.entries, moves, dups, large, self.leftovers, redl, empty = r
         self.sizes = {}
         self._fill_sort(moves)
-        self._fill_dups(dups)
+        self._fill_dups(dups, redl)
         self._fill_large(large)
         self._fill_empty(empty)
         extra = sum(len(g.files) - 1 for g in dups)
         reclaim = sum(g.size * (len(g.files) - 1) for g in dups)
-        counts = {"Sort": len(moves), "Duplicates": extra, "Large & Old": len(large), "Empty Folders": len(empty)}
+        n_large = len({f.path for f in large} | {x.path for x in self.leftovers})
+        counts = {"Sort": len(moves), "Duplicates": extra + len(redl), "Large & Old": n_large,
+                  "Empty Folders": len(empty)}
+
         def word(n: int, w: str) -> str:
             return w if n == 1 else w + "s"
 
         captions = {
             "Sort": f"{word(len(moves), 'file')} to sort",
-            "Duplicates": f"{word(extra, 'duplicate')} · {core.human_size(reclaim)} reclaimable",
-            "Large & Old": f"large or old {word(len(large), 'file')}",
+            "Duplicates": f"{word(extra, 'duplicate')} · {core.human_size(reclaim)} reclaimable"
+                          + (f"\n+ {len(redl)} possible re-download{'s' * (len(redl) != 1)}" if redl else ""),
+            "Large & Old": f"large, old or leftover {word(n_large, 'file')}",
             "Empty Folders": f"empty {word(len(empty), 'folder')}",
         }
         for i, (name, (card, num, cap)) in enumerate(self.cards.items()):
@@ -961,8 +1021,10 @@ class App(ctk.CTk):
         self.status.configure(text="Scan finished. Review the cards below." if total
                               else "Scan finished. This folder is already tidy.")
 
-    def _fill_sort(self, moves: list[core.Move]) -> None:
+    def _fill_sort(self, moves: core.SortPlan) -> None:
         self.moves = moves
+        n = moves.recent_left
+        self.sort_hint.configure(text=SORT_HINT + (f" {plural(n, 'recent file')} left alone." if n else ""))
         self.sort.set_moves(moves)
 
     def _size(self, p: Path) -> int:
@@ -972,18 +1034,36 @@ class App(ctk.CTk):
         """Re-check right before acting: a pin added after the scan still protects its files."""
         return [p for p in paths if not core.is_pinned(getattr(p, "src", p), self.pins)]
 
-    def _fill_dups(self, groups: list[core.DupGroup]) -> None:
+    def _fill_dups(self, groups: list[core.DupGroup], redownloads: list[core.Redownload] = ()) -> None:
         for g in groups:
             for f in g.files:
                 self.sizes[f] = g.size
-        self.dups.set_groups(groups, self.folder)
+        self.sizes.update({r.copy: r.copy_size for r in redownloads})
+        self.dups.set_groups(groups, self.folder, redownloads)
 
-    def _fill_large(self, large: list[core.FileInfo]) -> None:
+    def _fill_large(self, large: list[core.FileInfo] | None = None) -> None:
+        """Likely leftovers first (heading, nothing ticked), then the large/old files that aren't leftovers."""
+        if large is not None:
+            self._large = large
         cap = MAX_ROWS["Large & Old"]
-        self.sizes.update({f.path: f.size for f in large})
-        rows = [(f"{core.human_size(f.size)} · {f.age_days} days old · {self.rel(f.path)}", f.path)
-                for f in large[:cap]]
-        self.large.set_rows(rows, False, f"Showing the {cap} biggest." if len(large) > cap else "")
+        left = self.leftovers
+        mine = {x.path for x in left}
+        rest = [f for f in self._large if f.path not in mine]
+        self.sizes.update({f.path: f.size for f in self._large})
+        self.sizes.update({x.path: x.size for x in left})
+        days = lambda ts: int((time.time() - ts) / 86400)  # noqa: E731
+        rows: list[tuple[str, object]] = []
+        if left:
+            rows.append((f"Likely leftovers ({len(left)}). Not guaranteed safe: look at each one. Nothing is ticked.",
+                         None))
+            rows += [(f"{core.human_size(x.size)} · {x.reason} · {days(x.mtime)} days old · {self.rel(x.path)}", x.path)
+                     for x in left[:cap]]
+        if not self.leftovers_only:
+            if left and rest:
+                rows.append(("Large and old files", None))
+            rows += [(f"{core.human_size(f.size)} · {f.age_days} days old · {self.rel(f.path)}", f.path)
+                     for f in rest[:cap]]
+        self.large.set_rows(rows, False, f"Showing the {cap} biggest." if len(rest) > cap else "")
 
     def _fill_empty(self, empty: list[Path]) -> None:
         cap = MAX_ROWS["Empty Folders"]
@@ -997,8 +1077,8 @@ class App(ctk.CTk):
         if sel and confirm(
                 self, "Sort files?", f"Move {plural(len(sel), 'file')} into type folders inside\n{self.folder}?\n\n"
                 "Nothing is deleted. You can undo this with \"Undo last sort\".", f"Sort {plural(len(sel), 'file')}"):
-            folder = self.folder
-            self._run(lambda: core.apply_moves(sel, folder), self._move_done, cancellable=False)
+            folder, hours = self.folder, self._recent
+            self._run(lambda: core.apply_moves(sel, folder, recent_hours=hours), self._move_done, cancellable=False)
 
     def _move_done(self, result: tuple[int, list[str]]) -> None:
         self._report("Done", f"Moved {plural(result[0], 'file')}.", result[1])
@@ -1029,11 +1109,11 @@ class App(ctk.CTk):
     # ---------- recycle-bin actions ----------
 
     def refilter(self) -> None:
-        query = self._large_query()
-        if not self.folder or not query:
+        params = self._large_params()
+        if not self.folder or not params:
             return
         folder, c, entries = self.folder, self._cancel.is_set, self.entries
-        self._run(lambda: core.find_large_old(folder, cancel=c, entries=entries, **query), self._fill_large)
+        self._run(lambda: core.find_large_old(folder, *params, cancel=c, entries=entries), self._fill_large)
 
     def remove_dups(self) -> None:
         removals = [(g, self._unpinned([f for i, f in enumerate(g.files) if i != keep.get()]))
@@ -1043,10 +1123,16 @@ class App(ctk.CTk):
                                      {f for _, rem in removals for f in rem})
         except ValueError as e:
             return messagebox.showerror("Keep one copy", str(e))
-        n = sum(len(rem) for _, rem in removals)
+        copies = [r for r in self.dups.visible_copies() if not core.is_pinned(r.copy, self.pins)]
+        n = sum(len(rem) for _, rem in removals) + len(copies)
         if n and self._confirm_bin(n):
-            folder = self.folder
-            self._run(lambda: core.trash_duplicates(removals, folder), self._recycled, cancellable=False)
+            folder, going = self.folder, {f for _, rem in removals for f in rem}
+
+            def work() -> tuple[int, list[str]]:
+                a, b = core.trash_duplicates(removals, folder), core.trash_redownloads(copies, folder, removing=going)
+                return a[0] + b[0], a[1] + b[1]
+
+            self._run(work, self._recycled, cancellable=False)
 
     def _confirm_bin(self, n: int) -> bool:
         return confirm(

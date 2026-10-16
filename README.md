@@ -50,5 +50,8 @@ With Pillow installed (`pip install pillow`) it saves screenshots to `.pytest_tm
 - Antivirus may occasionally flag PyInstaller builds.
 - Items sent to the Recycle Bin are restored from the Bin, not through the app's Undo.
 
+## Support
+If this saved you time, you can support my work at [support.advaitachandra.in](https://support.advaitachandra.in).
+
 ## License
 MIT

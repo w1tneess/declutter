@@ -1,4 +1,4 @@
-"""Switch each rule off in turn; the suite must fail every time. Restores core.py at the end.
+"""Switch each rule off in turn; the suite must fail every time. Restores core.py and diag.py at the end.
 
 Run from anywhere:  python tools/mutation_check.py
 Exit code 1 if any mutant survives (a rule no test notices) or a pattern no longer matches core.py.
@@ -9,8 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 core = ROOT / "src" / "declutter" / "core.py"
-raw = core.read_bytes()  # restored byte for byte at the end, so line endings never change
-orig = core.read_text(encoding="utf-8")
+diag = ROOT / "src" / "declutter" / "diag.py"  # mutants named "R2 ..." change this file, the others core.py
+raws = {p: p.read_bytes() for p in (core, diag)}  # restored byte for byte at the end, so line endings never change
 M = {
     "A grace skip": ("        if recent_hours and last_touched(st) > cutoff:", "        if False:"),
     "A count": ("            plan.recent_left += 1\n", "            pass\n"),
@@ -50,19 +50,31 @@ M = {
     "R1 peek folder": ('UndoInfo(Path(moves[0]["src"]).parent, len(moves), age)', 'UndoInfo(Path(moves[0]["src"]), len(moves), age)'),
     "R1 peek unreadable time": ("        age = None\n    return UndoInfo", "        age = 0.0\n    return UndoInfo"),
     "F category": ('return "/".join(_bucket(self.dst))', "return self.dst.parent.name"),
+    "R2 whole numbers only": ("if type(v) is not int:", "if False:"),
+    "R2 setup twice": ('if any(getattr(h, "baseFilename", None) == path for h in log.handlers):', "if False:"),
+    "R2 rotation": ("maxBytes=max_bytes, backupCount=backups,", "maxBytes=0, backupCount=backups,"),
+    "R2 last n lines": ("deque(f, maxlen=n)", "deque(f, maxlen=n + 1)"),
+    "R2 logging never raises": ("    except OSError:\n        return  # no log, but", "    except ZeroDivisionError:\n        return  # no log, but"),
+    "R2 thread hook": ("if args.exc_type is not SystemExit:", "if False:"),
+    "R2 report version": ('f"Declutter {__version__}"', '"Declutter"'),
+    "R2 traceback": ("exc_info=exc_info or sys.exc_info()", "exc_info=None"),
 }
 bad = []
 try:
     for name, (a, b) in M.items():
+        path = diag if name.startswith("R2 ") else core
+        orig = path.read_text(encoding="utf-8")
         assert orig.count(a) == 1, f"{name}: pattern found {orig.count(a)} times"
-        core.write_text(orig.replace(a, b), encoding="utf-8")
+        path.write_text(orig.replace(a, b), encoding="utf-8")
         r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"],
                            capture_output=True, text=True, cwd=ROOT)
         caught = r.returncode != 0
         print(f"{'caught ' if caught else 'MISSED '} {name}", flush=True)
         if not caught:
             bad.append(name)
+        path.write_bytes(raws[path])  # back to the original before the next mutant
 finally:
-    core.write_bytes(raw)
+    for p, data in raws.items():
+        p.write_bytes(data)
 print("all caught" if not bad else f"missed: {bad}")
 sys.exit(1 if bad else 0)

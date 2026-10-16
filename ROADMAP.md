@@ -17,7 +17,7 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - core.peek_undo() returns folder, file count and age of the last sort. The Undo confirmation says: "Undo the sort of 14 files in Downloads (5 minutes ago)?" Test peek_undo headless.
 - UI copy never says "safe to delete". Say "likely leftover".
 
-## R2. Diagnostics (needed before real users)
+## R2. Diagnostics (needed before real users) - built, awaiting review
 - Rotating log at %LOCALAPPDATA%\Declutter\logs\declutter.log: operation type, counts, and full tracebacks. No file contents. Nothing is sent anywhere.
 - Settings > About: "Open log folder" and "Copy diagnostics" (app version, Windows version, last 200 log lines). The user reads it before sharing.
 - Unhandled exceptions in the Tk callback and in worker threads are logged and shown in the themed dialog.

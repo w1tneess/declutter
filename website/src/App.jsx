@@ -1662,9 +1662,7 @@ export default function App() {
             <li><a href="https://github.com/w1tneess/declutter/releases" target="_blank" rel="noopener noreferrer">Releases</a></li>
             <li><a href="https://github.com/w1tneess/declutter/issues" target="_blank" rel="noopener noreferrer">Issue Tracker</a></li>
             <li><a href="https://support.advaitachandra.in" target="_blank" rel="noopener noreferrer">Support</a></li>
-            <li><a href="https://github.com/w1tneess/declutter/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
-            <li><a href="https://support.advaitachandra.in" target="_blank" rel="noopener noreferrer">Support the developer</a></li>
-          </ul>
+            <li><a href="https://github.com/w1tneess/declutter/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>          </ul>
         </div>
       </footer>
     </div>

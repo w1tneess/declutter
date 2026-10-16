@@ -4,6 +4,7 @@ Windows desktop app that declutters a messy folder safely. Full spec: `SPEC.md` 
 
 ## Commands
 - Tests: `python -m pytest -q` (config in `pytest.ini`; temp dirs go to `.pytest_tmp/`)
+- Mutation check (after changing rules in `core.py`): `python tools/mutation_check.py`; it must print `all caught`
 - Run: `python -m declutter` from `src/` (or set `PYTHONPATH=src`)
 - Deps: `requirements.txt` (runtime), `requirements-dev.txt` (tests + PyInstaller)
 

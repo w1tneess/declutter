@@ -14,13 +14,15 @@ python -m PyInstaller --noconfirm --clean --onedir --windowed --name Declutter ^
 
 powershell -NoProfile -Command "Compress-Archive -Path dist\Declutter -DestinationPath dist\Declutter-portable.zip -Force" || goto :fail
 
-set ISCC=
-where iscc >nul 2>nul && set ISCC=iscc
-if "%ISCC%"=="" if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" set ISCC="%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
-if "%ISCC%"=="" (
+rem Path kept unquoted and quoted only when run: a quoted value breaks "if" at the space in "Inno Setup".
+set "ISCC="
+where iscc >nul 2>nul && set "ISCC=iscc"
+if not defined ISCC if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+if not defined ISCC if exist "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" set "ISCC=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"
+if not defined ISCC (
   echo Inno Setup not found, skipping the installer. Install it from https://jrsoftware.org/isinfo.php
 ) else (
-  %ISCC% /DAppVersion=%APP_VERSION% installer\declutter.iss || goto :fail
+  "%ISCC%" /DAppVersion=%APP_VERSION% installer\declutter.iss || goto :fail
 )
 echo Done. Output is in dist\
 exit /b 0

@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 core = ROOT / "src" / "declutter" / "core.py"
+raw = core.read_bytes()  # restored byte for byte at the end, so line endings never change
 orig = core.read_text(encoding="utf-8")
 M = {
     "A grace skip": ("        if recent_hours and last_touched(st) > cutoff:", "        if False:"),
@@ -62,6 +63,6 @@ try:
         if not caught:
             bad.append(name)
 finally:
-    core.write_text(orig, encoding="utf-8")
+    core.write_bytes(raw)
 print("all caught" if not bad else f"missed: {bad}")
 sys.exit(1 if bad else 0)

@@ -1744,6 +1744,74 @@ body {
   font-size: 0.68rem;
 }
 
+/* Bento Pins Visual */
+.bento-visual-pins {
+  background: #090E17;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  font-size: 0.8rem;
+}
+
+.pin-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #CBD5E1;
+}
+
+.pin-item code {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.pin-badge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #38BDF8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.context-item {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+  font-size: 0.76rem;
+  color: #94A3B8;
+}
+
+.context-item strong {
+  color: #FFF;
+}
+
+.simulation-tag-pill {
+  color: #FBBF24;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  margin-left: 8px;
+}
+
+.download-smartscreen-notice {
+  margin-top: 16px;
+  font-size: 0.84rem;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.download-smartscreen-notice strong {
+  color: var(--text-main);
+}
+
 /* ==================== Supported Formats Matrix ==================== */
 .extensions-section {
   padding: 100px 0;
@@ -1965,7 +2033,9 @@ body {
 
 .comparison-table-wrapper {
   display: grid;
-  grid-template-columns: 1fr 1.25fr;
+  grid-template-columns: 1fr;
+  max-width: 820px;
+  margin: 0 auto;
   gap: 28px;
   align-items: stretch;
 }

@@ -55,9 +55,10 @@ jobs:
           choco install innosetup --version $env:INNO_SETUP_VERSION --allow-downgrade -y --no-progress
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          $found = (Get-Item $iscc).VersionInfo.ProductVersion
-          Write-Host "Inno Setup compiler version: $found"
-          if (-not $found.StartsWith($env:INNO_SETUP_VERSION)) { throw "Expected Inno Setup $env:INNO_SETUP_VERSION but found $found" }
+          # ISCC.exe has no version resource, so ask Chocolatey what is installed ("innosetup|6.7.1").
+          $found = (choco list innosetup --exact --limit-output) -join ''
+          Write-Host "Installed: $found"
+          if ($found -ine "innosetup|$env:INNO_SETUP_VERSION") { throw "Expected Inno Setup $env:INNO_SETUP_VERSION but found '$found'" }
           & $iscc "/DAppVersion=$env:APP_VERSION" installer\declutter.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

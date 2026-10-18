@@ -5,7 +5,7 @@ setlocal
 cd /d "%~dp0"
 if "%APP_VERSION%"=="" set APP_VERSION=0.0.0-dev
 
-python -m pip install -r requirements-dev.txt || goto :fail
+python -m pip install --require-hashes -r requirements-dev.txt || goto :fail
 python -m pytest -q || goto :fail
 
 python -m PyInstaller --noconfirm --clean --onedir --windowed --name Declutter ^

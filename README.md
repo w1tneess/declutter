@@ -11,6 +11,14 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 
 Uninstall from Windows Settings > Apps. Website source is in `website/` (deployed with Vercel, see `vercel.json`).
 
+### Verify your download (optional)
+Every release carries a `SHA256SUMS.txt` and a signed build-provenance attestation made by the release workflow.
+```
+Get-FileHash .\Declutter-Setup.exe -Algorithm SHA256     # compare with the line in SHA256SUMS.txt
+gh attestation verify .\Declutter-Setup.exe --repo w1tneess/declutter
+```
+The checksum only proves the file matches what was published; the attestation proves it was built by this repository's workflow.
+
 ## What it does
 - **Sort by type**: moves loose files (top level only) into Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Screenshots (`Screenshot*`, `Snip*`, `Capture*`) go to Images/Screenshots and WhatsApp pictures (`IMG-########-WA####`, `WhatsApp Image*`) to Images/Chat. Shortcuts and config files (`.lnk`, `.url`, `.ini`) are never moved. Files you touched in the last 24 hours (setting, 0 to 72, on the Sort screen) are left alone, judged by the later of modified and created time, so a fresh copy of an old file counts as new. Undo supported.
 - **Duplicates**: finds identical files (size, then the first and last 64 KB, then SHA-256). Keeps the oldest copy unless you choose another. A separate **Possible re-downloads** section lists `name (1).ext` / `name - Copy.ext` next to `name.ext` when the size is within 2 %; nothing there is ticked for you and the original always stays.

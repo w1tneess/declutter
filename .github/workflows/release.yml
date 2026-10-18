@@ -3,28 +3,41 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Dry run: builds and checks everything, but never attests or publishes (those steps need a tag).
+  workflow_dispatch:
 
+# Nothing gets more than read access by default; the publish job asks for exactly what it needs.
 permissions:
-  contents: write
+  contents: read
+
+env:
+  # Chocolatey package version of Inno Setup, pinned so the installer is built by the same compiler every time.
+  INNO_SETUP_VERSION: "6.7.1"
 
 jobs:
-  release:
+  build:
     runs-on: windows-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v7
+      # Actions are pinned to full commit SHAs (tags are mutable); Dependabot keeps them current.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements*.txt
-      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip install --require-hashes -r requirements-dev.txt
       - run: python -m pytest -q
 
       - name: Stamp version from the tag (shown in Settings > About)
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME -replace '^v', '' } else { '0.0.0-dev' }
           Set-Content src\declutter\__init__.py "__version__ = `"$version`""
+          "APP_VERSION=$version" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
 
       - name: Build app (PyInstaller onedir)
         run: >
@@ -35,19 +48,63 @@ jobs:
       - name: Portable zip
         run: Compress-Archive -Path dist\Declutter -DestinationPath dist\Declutter-portable.zip -Force
 
-      - name: Installer (Inno Setup)
+      - name: Installer (Inno Setup, pinned version)
         shell: pwsh
         run: |
-          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
-          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
-          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
-          $version = $env:GITHUB_REF_NAME -replace '^v', ''
-          & $iscc "/DAppVersion=$version" installer\declutter.iss
+          # Always install the pinned version: the runner image may ship a different one.
+          choco install innosetup --version $env:INNO_SETUP_VERSION --allow-downgrade -y --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $found = (Get-Item $iscc).VersionInfo.ProductVersion
+          Write-Host "Inno Setup compiler version: $found"
+          if (-not $found.StartsWith($env:INNO_SETUP_VERSION)) { throw "Expected Inno Setup $env:INNO_SETUP_VERSION but found $found" }
+          & $iscc "/DAppVersion=$env:APP_VERSION" installer\declutter.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: |
+            dist/Declutter-Setup.exe
+            dist/Declutter-portable.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Only this job can write to the repository. It runs no code from the build, only the pinned
+    # actions below and checksum/gh commands on the files the build job produced.
+    permissions:
+      contents: write # create the release
+      id-token: write # sign the provenance attestation
+      attestations: write # store it
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: release
+
+      - name: Checksums
+        working-directory: release
+        run: |
+          sha256sum Declutter-Setup.exe Declutter-portable.zip > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      # Everything below only runs for a real release (a v* tag), never for the manual dry run.
+      - name: Attest build provenance
+        if: github.ref_type == 'tag'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            release/Declutter-Setup.exe
+            release/Declutter-portable.zip
+
       - name: Publish release
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create "$env:GITHUB_REF_NAME" dist\Declutter-Setup.exe dist\Declutter-portable.zip
-          --title "Declutter $env:GITHUB_REF_NAME" --generate-notes
+          gh release create "$GITHUB_REF_NAME" release/Declutter-Setup.exe release/Declutter-portable.zip release/SHA256SUMS.txt
+          --repo "$GITHUB_REPOSITORY" --verify-tag --title "Declutter $GITHUB_REF_NAME" --generate-notes

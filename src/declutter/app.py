@@ -174,7 +174,7 @@ def count_up(label, n: int, ms: int = 450) -> None:
 def reveal(p: Path) -> None:
     """Show the item selected in Explorer. Never opens it: that could run an installer."""
     if p.exists():
-        subprocess.Popen(f'explorer /select,"{p}"')
+        subprocess.Popen(["explorer", "/select,", str(p)])  # list args: no hand-built quoting
 
 
 def confirm(master, title: str, message: str, ok_text: str) -> bool:

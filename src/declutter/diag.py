@@ -1,8 +1,10 @@
 """Local diagnostics: a small rotating log and a report the user can read before sharing it.
 
-Nothing here touches the network. The log holds operation names, whole-number counts and tracebacks:
-`log_op` accepts integers only, so file names and contents cannot be written through it. Logging never
-raises: a read-only disk must not break a sort.
+Nothing here touches the network. The log holds operation names, whole-number counts and tracebacks.
+`log_op` accepts integers only, so file names cannot be written through it. Tracebacks and error messages
+can still contain a file path (for example "Permission denied: 'C:\\Users\\me\\a.pdf'"), never file contents;
+that is why the user reads the report before sharing it. Logging never raises: a read-only disk must not
+break a sort.
 """
 from __future__ import annotations
 

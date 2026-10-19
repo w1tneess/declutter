@@ -730,7 +730,7 @@ class App(ctk.CTk):
         for text, url in (("Support", SUPPORT), ("Source code", REPO), ("Website", SITE)):
             ctk.CTkButton(r, text=text, width=100, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
                           command=lambda u=url: webbrowser.open(u), **PLAIN).pack(side="right", padx=(8, 0))
-        r = row(card, "Diagnostics", "Kept on this computer. Nothing is sent.")
+        r = row(card, "Diagnostics", "Kept on this computer. Nothing is sent. May contain file names.")
         for text, cmd in (("Copy diagnostics", self.copy_diagnostics), ("Open log folder", self.open_logs)):
             ctk.CTkButton(r, text=text, width=130, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
                           command=cmd, **PLAIN).pack(side="right", padx=(8, 0))
@@ -744,7 +744,7 @@ class App(ctk.CTk):
     def copy_diagnostics(self) -> None:
         self.clipboard_clear()
         self.clipboard_append(diag.report())
-        self.toast("Diagnostics copied. Paste them into a text editor to read them before you share them.")
+        self.toast("Diagnostics copied. They can contain file names. Paste them into a text editor and read them before you share them.")
 
     def _add_pin(self, picked: str) -> None:
         if not picked:

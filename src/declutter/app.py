@@ -813,7 +813,29 @@ class App(ctk.CTk):
                 w.bind("<Enter>", lambda _e, c=card: c.configure(fg_color=T.SURFACE_ALT))
                 w.bind("<Leave>", lambda _e, c=card: c.configure(fg_color=T.SURFACE))
             self.cards[name] = (card, num, cap)
+        # Program and project folders are never entered; say how many were left out so nothing is hidden silently.
+        self.skipped: list[Path] = []
+        self.skip_row = ctk.CTkFrame(f, fg_color="transparent")
+        self.skip_label = ctk.CTkLabel(self.skip_row, text="", font=(FONT, 13.5), text_color=T.TEXT_MUTED)
+        self.skip_label.pack(side="left")
+        ctk.CTkButton(self.skip_row, text="Show them", width=90, height=28, corner_radius=T.R_BUTTON,
+                      font=(FONT, 13.5), command=self.show_skipped, **PLAIN).pack(side="left", padx=(6, 0))
         return f
+
+    def _show_skipped_note(self) -> None:
+        if self.skipped:
+            self.skip_label.configure(text=f"Skipped {plural(len(self.skipped), 'app/project folder')} "
+                                           "to keep them intact.")
+            self.skip_row.grid(row=7, columnspan=2, sticky="w", pady=(10, 0))  # under the cards (rows 5-6)
+        else:
+            self.skip_row.grid_forget()
+
+    def show_skipped(self) -> None:
+        lines = [self.rel(p) for p in self.skipped[:15]]
+        more = f"\n…and {len(self.skipped) - 15} more." if len(self.skipped) > 15 else ""
+        messagebox.showinfo("Skipped folders", "These look like programs or code projects (a .git or "
+                            "package.json, or an .exe next to a .dll), so Declutter did not look inside them:\n\n"
+                            + "\n".join(lines) + more)
 
     def _build_sort_header(self) -> None:
         self.sort_hint = ctk.CTkLabel(self.sort.head, text=SORT_HINT, font=(FONT, 13.5), text_color=T.TEXT_MUTED)
@@ -898,6 +920,8 @@ class App(ctk.CTk):
         # core returns paths under the resolved folder, so keep the same form to make relative paths work
         self.folder = p.resolve()
         self.entries, self.leftovers, self._large = None, [], []
+        self.skipped = []
+        self._show_skipped_note()
         self.sort_hint.configure(text=SORT_HINT)
         T.save_settings(last_folder=str(self.folder))
         self.folder_label.configure(text=f"Folder: {self.folder}")
@@ -992,7 +1016,8 @@ class App(ctk.CTk):
 
         def work():
             p("Reading the folder…")
-            entries = core.scan_entries(folder, cancel=c, ignore=pins)  # one walk shared by all checks
+            skipped: list[Path] = []
+            entries = core.scan_entries(folder, cancel=c, ignore=pins, skipped=skipped)  # one walk for all checks
             moves = core.plan_sort(folder, cancel=c, entries=entries, recent_hours=hours)
             dups = core.find_duplicates(folder, progress=p, cancel=c, entries=entries)
             large = core.find_large_old(folder, *params, cancel=c, entries=entries)
@@ -1001,13 +1026,14 @@ class App(ctk.CTk):
             redl = core.find_redownloads(folder, entries=entries, cancel=c,
                                          exclude={f for g in dups for f in g.files})
             p("Looking for empty folders…")
-            return entries, moves, dups, large, left, redl, core.find_empty_dirs(folder, cancel=c, ignore=pins)
+            return entries, moves, dups, large, left, redl, core.find_empty_dirs(folder, cancel=c, ignore=pins), skipped
 
         self.status.configure(text="Scanning…")
         self._run(work, self._scan_done)
 
     def _scan_done(self, r) -> None:
-        self.entries, moves, dups, large, self.leftovers, redl, empty = r
+        self.entries, moves, dups, large, self.leftovers, redl, empty, self.skipped = r
+        self._show_skipped_note()
         self.sizes = {}
         self._fill_sort(moves)
         self._fill_dups(dups, redl)

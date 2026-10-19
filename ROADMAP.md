@@ -27,7 +27,8 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - Audit first: can the user already see every file that will move and untick or pin one from its row? M3 reported per-file sort as working, so do not rebuild it.
 - Build only what is missing: pin ("Never touch") from the file row, then re-plan without rescanning.
 
-## R4. Project and portable-app boundary (delta only)
+## R4. Project and portable-app boundary (delta only) - built, awaiting review
+Decision made while building: the .exe+.dll rule applies to subfolders only. The folder the user picks is never refused for it (Downloads can hold a loose .exe and .dll).
 Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .hg, venv, pyproject.toml, Cargo.toml.
 - Also treat a folder containing both an .exe and a .dll as a portable app: do not enter it. Failure direction is safe (less is offered), but it hides cleanup silently, so:
   - show "Skipped N app/project folders to keep them intact" with a "Show them" link;

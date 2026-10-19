@@ -50,6 +50,17 @@ M = {
     "R1 peek folder": ('UndoInfo(Path(moves[0]["src"]).parent, len(moves), age)', 'UndoInfo(Path(moves[0]["src"]), len(moves), age)'),
     "R1 peek unreadable time": ("        age = None\n    return UndoInfo", "        age = 0.0\n    return UndoInfo"),
     "F category": ('return "/".join(_bucket(self.dst))', "return self.dst.parent.name"),
+    "R4 marker .svn": ('".svn", ', ""),
+    "R4 marker .hg": ('".hg", ', ""),
+    "R4 marker venv": ('"venv", ', ""),
+    "R4 marker pyproject": ('"pyproject.toml",\n                   "cargo.toml"}', '"cargo.toml"}'),
+    "R4 marker cargo": ('"pyproject.toml",\n                   "cargo.toml"}', '"pyproject.toml"}'),
+    "R4 app folder needs a dll": ('and any(n.endswith(".dll") for n in lower_names)', ""),
+    "R4 app folder dll or exe": ('for n in lower_names) and any(n.endswith(".dll")', 'for n in lower_names) or any(n.endswith(".dll")'),
+    "R4 app folders skipped in walk": ("if is_project(names) or (here != root_s and is_app_folder(names)):", "if is_project(names):"),
+    "R4 chosen folder exempt": ("(here != root_s and is_app_folder(names))", "is_app_folder(names)"),
+    "R4 skipped reported": ("                skipped.append(Path(here))", "                pass"),
+    "R4 app folders not searched for empty": ("if is_project(names) or (d != root_s and is_app_folder(names)):", "if is_project(names):"),
 }
 bad = []
 try:

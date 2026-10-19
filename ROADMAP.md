@@ -23,17 +23,21 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - Unhandled exceptions in the Tk callback and in worker threads are logged and shown in the themed dialog.
 - Why: the app currently has no logging, so a crash on a friend's PC cannot be diagnosed.
 
-## R3. Sort preview audit, then gaps only
+## R3. Sort preview audit, then gaps only - built, awaiting review
 - Audit first: can the user already see every file that will move and untick or pin one from its row? M3 reported per-file sort as working, so do not rebuild it.
+  - Audit result: every file that will move is listed under its destination folder, ticked, with Select all/none and a filter; at most 300 rows are shown and only shown rows move. Missing: pin from the row.
 - Build only what is missing: pin ("Never touch") from the file row, then re-plan without rescanning.
+  - Done: a "Never touch" button on each row greys that row out in place ("Pinned", unticked, not counted) and drops the file from the plan (no walk of the folder, no relayout: 22 ms at 300 rows; removing the row cost 225 ms). Other lists update on the next scan; their actions skip pinned files anyway.
 
-## R4. Project and portable-app boundary (delta only)
+## R4. Project and portable-app boundary (delta only) - built, awaiting review
+Decision made while building: the .exe+.dll rule applies to subfolders only. The folder the user picks is never refused for it (Downloads can hold a loose .exe and .dll).
 Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .hg, venv, pyproject.toml, Cargo.toml.
 - Also treat a folder containing both an .exe and a .dll as a portable app: do not enter it. Failure direction is safe (less is offered), but it hides cleanup silently, so:
   - show "Skipped N app/project folders to keep them intact" with a "Show them" link;
   - tests: a project folder, a portable-app folder, and a plain folder with only an .exe.
 
 ## R5. UI backlog - built, awaiting review
+- Rebuilding a 300-row list blocks the window (measured: about 0.4 s in the real event loop on main, Sort tab, after a sort, a rescan or a grace-period change). CustomTkinter makes and destroys about three widgets per row. Tried chunked destroying: worse (about 1 s). Options: fewer widgets per row, a lower row cap, or a canvas-drawn list.
 - Toast must not overlap the primary action button (anchor it left/centre of the status bar).
   - Done: it sits at the bottom left above the footer row; gui_check proves it clears the action button, the selection label and the status text on every page at 100/125/150% and at both window sizes.
 - One themed alert() dialog replacing the remaining native messageboxes.

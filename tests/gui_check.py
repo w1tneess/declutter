@@ -77,6 +77,10 @@ put("pack/a.txt", b"hello")
 os.utime(small / "pack.zip", (old, old))
 put("docs/report.pdf", b"x" * 1000)
 put("docs/report (1).pdf", b"y" * 1005)
+put("appdir/run.exe", b"MZ app")  # a program folder (.exe next to a .dll) and a project folder: both left alone
+put("appdir/lib.dll", b"MZ lib")
+put("proj/package.json", b"{}")
+put("proj/code.js", b"x")
 for n in ("Screenshot 1.png", "WhatsApp Image 1.jpg", "photo.png", "a.lnk"):
     put(n, n.encode())  # different bytes, so they are not exact duplicates of each other
 n_files = len(files)
@@ -113,6 +117,17 @@ def settle(ms=600):
     while time.time() < end:
         app.update()
         time.sleep(0.01)
+
+
+def focus_ok() -> bool:
+    """Key and focus events only reach this window while Windows gives it the foreground (not on a locked
+    screen, or while another program is in front). Ask loudly; say whether it worked."""
+    app.attributes("-topmost", True)
+    app.update()
+    app.attributes("-topmost", False)
+    app.focus_force()
+    settle(200)
+    return app.focus_displayof() is not None
 
 
 def shoot(name, win=None):
@@ -190,15 +205,17 @@ settle(300)
 assert app._toast.place_info()["y"] != y_first, "with animations on it slides"
 A.animations_on = real_on
 settle(900)
-app.focus_force()
-app.event_generate("<Control-Key-2>")
-settle(100)
-assert app.current == "Sort", app.current
-app.show("Duplicates")
-app.event_generate("<Control-f>")
-settle(100)
-assert app.focus_get() is not None and str(app.focus_get()).startswith(str(app.dups.search))
-print("motion + shortcuts OK")
+if focus_ok():
+    app.event_generate("<Control-Key-2>")
+    settle(100)
+    assert app.current == "Sort", app.current
+    app.show("Duplicates")
+    app.event_generate("<Control-f>")
+    settle(100)
+    assert app.focus_get() is not None and str(app.focus_get()).startswith(str(app.dups.search))
+    print("motion + shortcuts OK")
+else:
+    print("motion OK; shortcut keys NOT CHECKED (the window has no OS focus)")
 app.show("Duplicates")
 settle(300)
 assert app.dups.head.winfo_height() <= 2, app.dups.head.winfo_height()
@@ -252,26 +269,33 @@ print("pins OK")
 
 # ---- keyboard: Tab focus shows a ring, Space activates, and a focused row scrolls into view
 app.show("Home")
-app.focus_force()  # focus events only fire while this window has the OS focus
-settle(200)
+focus_ok()  # focus events only fire while this window has the OS focus
 app.scan_btn.focus_set()
 settle(100)
-assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS
-app.focus_get().tk_focusNext().focus_set()
-settle(100)
-assert app.scan_btn.cget("border_width") != 2, "ring must go when focus leaves"
+# Focus events only fire while Windows gives this window the foreground. If another program holds it (a locked
+# screen, a window the user is working in), nothing here can be proved: say so loudly instead of failing.
+FOCUS_OK = app.focus_get() is not None
+if not FOCUS_OK:
+    print("SKIPPED keyboard focus checks: the window has no OS focus (run again with the screen unlocked)")
+if FOCUS_OK:
+    assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS, \
+        (app.scan_btn.cget("border_width"), app.focus_get(), app.focus_displayof())
+    app.focus_get().tk_focusNext().focus_set()
+    settle(100)
+    assert app.scan_btn.cget("border_width") != 2, "ring must go when focus leaves"
 app.show("Empty Folders")
 pump(lambda: len(app.empty.rows) == 21)
 settle(300)
 last = app.empty.rows[-1][0]
 last.focus_set()
 settle(300)
-assert "underline" in last.cget("font"), last.cget("font")
-assert app.empty.list._parent_canvas.yview()[0] > 0, "focused row must scroll into view"
-before = app.empty.items[-1][0].get()
-last._text_label.event_generate("<space>")
-assert app.empty.items[-1][0].get() != before, "Space toggles a focused checkbox"
-last._text_label.event_generate("<space>")
+if FOCUS_OK:
+    assert "underline" in last.cget("font"), last.cget("font")
+    assert app.empty.list._parent_canvas.yview()[0] > 0, "focused row must scroll into view"
+    before = app.empty.items[-1][0].get()
+    last._text_label.event_generate("<space>")
+    assert app.empty.items[-1][0].get() != before, "Space toggles a focused checkbox"
+    last._text_label.event_generate("<space>")
 for mode in ("Light", "Dark"):
     app._set_theme(mode)
     settle(300)
@@ -281,7 +305,7 @@ app.scan_btn.focus_set()
 settle(200)
 shoot("focus_button_Light")
 app._set_theme("Light")
-print("keyboard focus OK")
+print("keyboard focus OK" if FOCUS_OK else "keyboard focus NOT CHECKED (no OS focus)")
 
 # ---- actions get no Cancel button, and their result is always reported
 seen, done = [], []
@@ -291,6 +315,7 @@ assert done == [(0, [])] and not any(seen), (done, seen)
 print("non-cancellable job OK")
 
 # ---- screenshots: both themes, 100/125/150 % scaling, all pages, at the minimum window size too
+rings_unchecked = 0
 for scale in (1.0, 1.25, 1.5):
     ctk.set_widget_scaling(scale)
     ctk.set_window_scaling(scale)
@@ -301,17 +326,19 @@ for scale in (1.0, 1.25, 1.5):
             settle(400)
             if size == "1100x720":  # keyboard focus rings at 100/125/150 %, both themes: a button and a checkbox
                 app.show("Home")
-                app.focus_force()
-                app.scan_btn.focus_set()
-                settle(200)
-                assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS, \
-                    ("button focus ring", scale, mode)
-                app.show("Empty Folders")
-                box = app.empty.rows[0][0]
-                box.focus_set()
-                settle(200)
-                assert "underline" in box.cget("font"), ("checkbox focus ring", scale, mode)
-                app.focus_set()
+                if focus_ok():
+                    app.scan_btn.focus_set()
+                    settle(200)
+                    assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS, \
+                        ("button focus ring", scale, mode)
+                    app.show("Empty Folders")
+                    box = app.empty.rows[0][0]
+                    box.focus_set()
+                    settle(200)
+                    assert "underline" in box.cget("font"), ("checkbox focus ring", scale, mode)
+                    app.focus_set()
+                else:
+                    rings_unchecked += 1
             if mode == "Light":  # the toast never lands on an action button, whatever the page, size or scale
                 for page in ("Sort", "Duplicates", "Large & Old", "Empty Folders"):
                     app.show(page)
@@ -345,6 +372,8 @@ for scale in (1.0, 1.25, 1.5):
                 app.show("Duplicates")
                 settle(250)
                 shoot(f"{int(scale * 100)}_{mode}_min_Duplicates")
+print("focus rings at 100/125/150 %: " + ("OK" if not rings_unchecked else
+                                          f"NOT CHECKED {rings_unchecked} of 6 times (the window had no OS focus)"))
 ctk.set_widget_scaling(1.0)
 ctk.set_window_scaling(1.0)
 app._set_theme("Light")
@@ -380,6 +409,17 @@ assert app.large.rows[0][0].cget("text").startswith("Likely leftovers (3)"), app
 assert {m.category for m in app.moves} == {"Images/Screenshots", "Images/Chat", "Images", "Archives"}, \
     {m.category for m in app.moves}
 assert "a.lnk" not in {m.src.name for m in app.moves}
+assert sorted(p.name for p in app.skipped) == ["appdir", "proj"], app.skipped
+assert app.skip_row.winfo_manager() and app.skip_label.cget("text") == \
+    "Skipped 2 app/project folders to keep them intact.", app.skip_label.cget("text")
+shown = []
+real_alert, A.alert = A.alert, lambda master, title, msg: shown.append((title, msg))
+app.show_skipped()
+A.alert = real_alert
+assert shown[0][0] == "Skipped folders" and "appdir" in shown[0][1] and "proj" in shown[0][1], shown
+app.show("Home")
+settle(300)
+shoot("skipped_note")
 assert [c[1].copy.name for c in app.dups.copies] == ["report (1).pdf"] and not app.dups.copies[0][0].get()
 assert app.dups.selected() == [], app.dups.selected()
 assert "possible re-download" in app.cards["Duplicates"][2].cget("text"), app.cards["Duplicates"][2].cget("text")
@@ -422,7 +462,69 @@ pump(lambda: not app._busy)
 assert "recent files left alone" in app.sort_hint.cget("text"), app.sort_hint.cget("text")
 assert app.sort.files == [] and app.settings is not None and A.T.load_settings()["recent_hours"] == 24
 print(f"leftovers + re-downloads + sub-buckets + grace period OK, longest UI update {worst * 1000:.0f} ms")
+app.set_folder(big)
+assert not app.skip_row.winfo_manager() and app.skipped == [], "the skipped note belongs to the scanned folder"
 
+# ---- R3: pin a file from its Sort row; its row is removed in place and the plan keeps the rest, no new walk
+many = base / "many"
+many.mkdir()
+for i in range(320):
+    f = many / f"note{i:03}.txt"
+    f.write_bytes(f"note {i}".encode())
+    os.utime(f, (old, old))
+walks = []
+real_scan = A.core.scan_entries
+A.core.scan_entries = lambda *a, **k: (walks.append(1), real_scan(*a, **k))[1]
+app.recent_text.set("0")
+app._set_recent()
+pump(lambda: not app._busy)
+app.set_folder(many)
+worst = 0.0
+app.scan()
+pump(lambda: not app._busy and app.entries is not None)
+pump(lambda: len(app.sort.files) == 300)  # 320 files, capped at 300 rows
+buttons_in = lambda w, text: int(isinstance(w, ctk.CTkButton) and w.cget("text") == text) + sum(  # noqa: E731
+    buttons_in(c, text) for c in w.winfo_children())
+assert buttons_in(app.sort.list, "Never touch") == 300, buttons_in(app.sort.list, "Never touch")
+app.show("Sort")
+for mode in ("Light", "Dark"):
+    app._set_theme(mode)
+    settle(300)
+    shoot(f"sort_rows_{mode}")
+build_worst = worst
+walks.clear()
+mv = app.sort.files[0][1]
+worst = 0.0
+t0 = time.perf_counter()
+app.pin_move(mv)  # the row is greyed out in place: no rebuild, no relayout of the 300-row list
+call_ms = (time.perf_counter() - t0) * 1000
+quiet = time.time() + 0.6
+pump(lambda: time.time() > quiet)  # let Tk redraw, timing each event
+pin_ms = max(call_ms, worst * 1000)
+assert walks == [], "pinning must not walk the folder again"
+assert not app._busy and len(app.sort.files) == 300, "the row stays, greyed out"
+assert buttons_in(app.sort.list, "Never touch") == 299 and buttons_in(app.sort.list, "Pinned") == 1
+assert not app.sort.files[0][0].get() and mv not in app.sort.selected() and len(app.sort.selected()) == 299
+app.sort.select_all(True)
+assert mv not in app.sort.selected() and len(app.sort.selected()) == 299, "Select all must not tick a pinned row"
+assert app.sort.action_btn.cget("text") == "Sort 299 files", app.sort.action_btn.cget("text")
+assert len(app.moves) == 319 and mv.src not in {m.src for m in app.moves}
+headings = [t for t in (c.cget("text") for b in app.sort.list.winfo_children() for c in b.winfo_children()
+                        if isinstance(c, ctk.CTkLabel)) if t.startswith("Documents")]
+assert len(headings) == 1 and headings[0].startswith("Documents · 299 files"), headings
+assert str(mv.src.resolve()) in A.T.load_settings()["pins"] and mv.src.exists()
+A.confirm = lambda *a: True
+app.move()
+pump(lambda: not app._busy)
+pump(lambda: not app._busy and app.entries is not None)
+assert mv.src.exists() and not (many / "Documents" / mv.src.name).exists(), "a pinned file is never moved"
+moved = len(list((many / "Documents").iterdir()))
+assert moved == 299, (moved, len(list(many.iterdir())), app.status.cget("text"))
+app._set_pins([])
+pump(lambda: not app._busy)
+A.core.scan_entries = real_scan
+assert build_worst < 0.25 and pin_ms < 250, (build_worst, pin_ms)
+print(f"pin from Sort row OK: 300 rows built with longest UI update {build_worst * 1000:.0f} ms, pin took {pin_ms:.0f} ms")
 # ---- diagnostics: operations are logged, About has two buttons, errors are logged and shown in the themed dialog
 from declutter import __version__, diag  # noqa: E402
 log = "\n".join(diag.recent_lines(500))
@@ -443,7 +545,9 @@ for mode in ("Light", "Dark"):
     settle(300)
     for name in ("Copy diagnostics", "Open log folder"):
         b = found[name]
-        assert b.winfo_ismapped() and not clipped(b) and b.winfo_rooty() >= app.winfo_rooty(), (mode, name)
+        assert b.winfo_ismapped() and not clipped(b) and b.winfo_rooty() >= app.winfo_rooty(), \
+            (mode, name, b.winfo_ismapped(), clipped(b), b.winfo_rooty(), app.winfo_rooty(), app.winfo_height(),
+             app.pages["Settings"]._parent_canvas.yview())
     shoot(f"about_{mode}")
 opened = []
 A.os.startfile = opened.append

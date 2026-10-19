@@ -14,7 +14,7 @@ A modern, easy-to-use Windows desktop app that declutters a messy folder safely.
 6. A duplicate group may never have all its copies selected.
 7. Never claim a feature works without testing it (see Testing).
 8. Leave alone: active downloads (`.crdownload`, `.part`, `.tmp`, `.download`, `.opdownload`, `.!qB`; a `.crdownload` or `.part` untouched for 3 days counts as dead and is offered only in "Likely leftovers"), files modified in the last 5 minutes, and OneDrive online-only placeholders (never hashed or moved).
-9. Project folders (containing `.git`, `node_modules`, `.venv`, `package.json` or a `.sln` file) are never entered, sorted, counted as empty or removed.
+9. Project folders (containing `.git`, `.svn`, `.hg`, `node_modules`, `.venv`, `venv`, `package.json`, `pyproject.toml`, `Cargo.toml` or a `.sln` file) and portable-app folders (a subfolder holding both an `.exe` and a `.dll`) are never entered, sorted, counted as empty or removed. The folder the user picks is refused if it is a project folder, but an `.exe` next to a `.dll` there is allowed. After a scan the app says how many such folders were skipped and can list them.
 10. Removals only on local fixed drives; network and removable drives are refused (the Recycle Bin may not exist there).
 11. One failing item never aborts a batch; failures are collected and listed to the user.
 

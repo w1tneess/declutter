@@ -178,6 +178,18 @@ assert app._toast.winfo_ismapped()
 shoot("toast")
 settle(1200)
 assert not app._toast.winfo_exists(), "toast must hide itself"
+real_on, A.animations_on = A.animations_on, lambda: False  # Windows "Animation effects" off: no slide at all
+app.toast("Moved 3 files.", ms=600)
+y_first = app._toast.place_info()["y"]
+settle(300)
+assert app._toast.place_info()["y"] == y_first, "with animations off the toast is placed straight away"
+A.animations_on = lambda: True
+app.toast("Moved 3 files.", ms=600)
+y_first = app._toast.place_info()["y"]
+settle(300)
+assert app._toast.place_info()["y"] != y_first, "with animations on it slides"
+A.animations_on = real_on
+settle(900)
 app.focus_force()
 app.event_generate("<Control-Key-2>")
 settle(100)
@@ -287,6 +299,37 @@ for scale in (1.0, 1.25, 1.5):
         for size in ("1100x720", "860x560"):
             app.geometry(size)
             settle(400)
+            if size == "1100x720":  # keyboard focus rings at 100/125/150 %, both themes: a button and a checkbox
+                app.show("Home")
+                app.focus_force()
+                app.scan_btn.focus_set()
+                settle(200)
+                assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS, \
+                    ("button focus ring", scale, mode)
+                app.show("Empty Folders")
+                box = app.empty.rows[0][0]
+                box.focus_set()
+                settle(200)
+                assert "underline" in box.cget("font"), ("checkbox focus ring", scale, mode)
+                app.focus_set()
+            if mode == "Light":  # the toast never lands on an action button, whatever the page, size or scale
+                for page in ("Sort", "Duplicates", "Large & Old", "Empty Folders"):
+                    app.show(page)
+                    app.toast("Sent 12 items to the Recycle Bin. Restore them from the Bin if needed.", ms=3000)
+                    settle(450)
+                    t, tab = app._toast, app.pages[page]
+
+                    def box_of(w):
+                        return (w.winfo_rootx(), w.winfo_rooty(), w.winfo_rootx() + w.winfo_width(),
+                                w.winfo_rooty() + w.winfo_height())
+                    tx0, ty0, tx1, ty1 = box_of(t)
+                    for what, w in (("action button", tab.action_btn), ("selection label", tab.sel_label),
+                                    ("status text", app.status)):
+                        bx0, by0, bx1, by1 = box_of(w)
+                        assert tx1 <= bx0 or bx1 <= tx0 or ty1 <= by0 or by1 <= ty0, \
+                            f"toast covers the {page} {what} at {scale} {size}: {(tx0, ty0, tx1, ty1)} vs {(bx0, by0, bx1, by1)}"
+                    assert tx0 >= app.winfo_rootx() and tx1 <= app.winfo_rootx() + app.winfo_width() + 1, (page, size)
+                    t.destroy()
             for page in ("Home", "Duplicates", "Large & Old", "Empty Folders", "Sort", "Settings"):
                 app.show(page)
                 settle(250)

@@ -33,10 +33,14 @@ Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .
   - show "Skipped N app/project folders to keep them intact" with a "Show them" link;
   - tests: a project folder, a portable-app folder, and a plain folder with only an .exe.
 
-## R5. UI backlog
+## R5. UI backlog - built, awaiting review
 - Toast must not overlap the primary action button (anchor it left/centre of the status bar).
+  - Done: it sits at the bottom left above the footer row; gui_check proves it clears the action button, the selection label and the status text on every page at 100/125/150% and at both window sizes.
 - One themed alert() dialog replacing the remaining native messageboxes.
+  - Done: the only native box left is the fallback if the themed dialog itself fails (a unit test pins this).
 - Every new transition respects the Windows animation setting; focus rings at 100/125/150%.
+  - Done: the setting is read each time (it was read once at start); focus rings are checked at all three scales in both themes.
+- Not done (see R3 note on the 300-row rebuild): the list rebuild freeze.
 
 ## Later, only if real users ask
 - Year-Month sub-folders (opt-in). Risk: moves the mess one level deeper and adds undo cases.

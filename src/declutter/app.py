@@ -132,12 +132,9 @@ def animations_on() -> bool:
         return True
 
 
-ANIMATE = animations_on()
-
-
 def fade_in(win, ms: int = 180) -> None:
     """Fade a window in. Any failure leaves it fully visible, never stuck transparent."""
-    if not ANIMATE:
+    if not animations_on():  # asked each time: the Windows setting can change while the app is open
         return
     steps = 9
 
@@ -159,7 +156,7 @@ def fade_in(win, ms: int = 180) -> None:
 
 def count_up(label, n: int, ms: int = 450) -> None:
     """Animate a number label from 0 to n with an ease-out, ending exactly on n."""
-    if not ANIMATE or n <= 0:
+    if n <= 0 or not animations_on():
         return label.configure(text=f"{n:,}")
     steps = 15
 
@@ -926,7 +923,7 @@ class App(ctk.CTk):
             return self.status.configure(text="Please wait for the current job to finish (or press Cancel).")
         ok, reason = core.check_root(p)
         if not ok:
-            messagebox.showwarning("Can't use this folder", reason)
+            alert(self, "Can't use this folder", reason)
             return
         # core returns paths under the resolved folder, so keep the same form to make relative paths work
         self.folder = p.resolve()
@@ -1006,7 +1003,7 @@ class App(ctk.CTk):
             if mb < 0 or days < 0:
                 raise ValueError
         except ValueError:
-            messagebox.showwarning("Check the filters", "Size and age must be numbers, 0 or more.")
+            alert(self, "Check the filters", "Size and age must be numbers, 0 or more.")
             return None
         T.save_settings(min_mb=self.min_mb.get(), older_days=self.older.get())
         return mb, days
@@ -1144,7 +1141,7 @@ class App(ctk.CTk):
     def undo(self) -> None:
         info = core.peek_undo()
         if not info:
-            return messagebox.showinfo("Undo", "Nothing to undo.")
+            return alert(self, "Undo", "Nothing to undo.")
         when = "" if info.age_seconds is None else f" ({core.ago(info.age_seconds)})"
         if confirm(self, "Undo last sort?", f"Undo the sort of {plural(info.count, 'file')} in "
                    f"{info.folder.name or info.folder}{when}?\n\nThe files go back where they were.",
@@ -1181,7 +1178,7 @@ class App(ctk.CTk):
             core.check_dup_selection([g for _, _, g in self.dups.groups],
                                      {f for _, rem in removals for f in rem})
         except ValueError as e:
-            return messagebox.showerror("Keep one copy", str(e))
+            return alert(self, "Keep one copy", str(e))
         copies = [r for r in self.dups.visible_copies() if not core.is_pinned(r.copy, self.pins)]
         n = sum(len(rem) for _, rem in removals) + len(copies)
         if n and self._confirm_bin(n):
@@ -1221,25 +1218,28 @@ class App(ctk.CTk):
             msg += f"\n\n{len(errors)} had problems:\n" + "\n".join(errors[:8])
             if len(errors) > 8:
                 msg += f"\n…and {len(errors) - 8} more."
-            return messagebox.showwarning(title, msg)
+            return alert(self, title, msg)
         self.toast(msg)
 
     def toast(self, text: str, ms: int = 4500) -> None:
-        """Slides up above the status bar, then slides away by itself."""
+        """Slides up at the bottom left, above the footer row, so it never covers the action buttons, the
+        selection label or the status text; slides away by itself."""
         old = getattr(self, "_toast", None)
         if old is not None and old.winfo_exists():
             old.destroy()
         t = self._toast = ctk.CTkFrame(self, corner_radius=T.R_BUTTON, fg_color=T.TEXT)
-        ctk.CTkLabel(t, text=text, font=(FONT, 14), text_color=T.BG, wraplength=460,
-                     justify="left").pack(padx=18, pady=12)
-        rest = -(48 + 16)  # just above the 48 px status bar
+        room = self.winfo_width() - T.SIDEBAR_W - 2 * T.PAD_X - 40  # stay inside the page, whatever the window size
+        ctk.CTkLabel(t, text=text, font=(FONT, 14), text_color=T.BG, wraplength=max(240, min(560, room)),
+                     justify="left").pack(padx=18, pady=10)
+        rest = -(48 + 20 + 38 + 28)  # above the 48 px status bar, the 38 px footer buttons, their gap and a margin
+        animate = animations_on()
 
         def slide(start: float, end: float, then=None, i: int = 1, steps: int = 10) -> None:
             if not t.winfo_exists():
                 return
-            y = end if not ANIMATE else start + (end - start) * (1 - (1 - i / steps) ** 3)
-            t.place(relx=1.0, rely=1.0, x=-T.PAD_X, y=y, anchor="se")
-            if ANIMATE and i < steps:
+            y = end if not animate else start + (end - start) * (1 - (1 - i / steps) ** 3)
+            t.place(relx=0.0, rely=1.0, x=T.SIDEBAR_W + T.PAD_X, y=y, anchor="sw")
+            if animate and i < steps:
                 self.after(18, slide, start, end, then, i + 1)
             elif then:
                 then()

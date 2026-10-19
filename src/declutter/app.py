@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import gc
+import os
 import queue
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from typing import Callable
 
 import customtkinter as ctk
 
-from . import __version__, core, theme as T
+from . import __version__, core, diag, theme as T
 from .theme import FONT
 
 SITE = "https://w1tneess.github.io/declutter/"
@@ -177,8 +178,14 @@ def reveal(p: Path) -> None:
         subprocess.Popen(f'explorer /select,"{p}"')
 
 
-def confirm(master, title: str, message: str, ok_text: str) -> bool:
-    """Modal confirm dialog in the app's theme. Cancel is the default; Esc cancels."""
+def alert(master, title: str, message: str) -> None:
+    """Modal message with one OK button, in the app's theme. Esc closes it."""
+    confirm(master, title, message, "OK", cancel_text=None)
+
+
+def confirm(master, title: str, message: str, ok_text: str, cancel_text: str | None = "Cancel") -> bool:
+    """Modal confirm dialog in the app's theme. Cancel is the default; Esc cancels.
+    Without a cancel_text there is only the OK button (see alert)."""
     win = ctk.CTkToplevel(master, fg_color=T.BG)
     win.title(title)
     win.resizable(False, False)
@@ -197,11 +204,14 @@ def confirm(master, title: str, message: str, ok_text: str) -> bool:
                  wraplength=420).pack(anchor="w", padx=T.GAP + 4)
     row = ctk.CTkFrame(card, fg_color="transparent")
     row.pack(fill="x", padx=T.GAP + 4, pady=T.GAP + 4)
-    ctk.CTkButton(row, text=ok_text, height=38, corner_radius=T.R_BUTTON, font=(FONT, 14, "bold"),
-                  command=lambda: close(True), **PRIMARY).pack(side="right")
-    cancel = ctk.CTkButton(row, text="Cancel", width=90, height=38, corner_radius=T.R_BUTTON, font=(FONT, 14),
-                           command=lambda: close(False), **GHOST)
-    cancel.pack(side="right", padx=(0, 10))
+    ok = ctk.CTkButton(row, text=ok_text, height=38, corner_radius=T.R_BUTTON, font=(FONT, 14, "bold"),
+                       command=lambda: close(True), **PRIMARY)
+    ok.pack(side="right")
+    cancel = ok  # with no Cancel button, OK is the safe default
+    if cancel_text:
+        cancel = ctk.CTkButton(row, text=cancel_text, width=90, height=38, corner_radius=T.R_BUTTON,
+                               font=(FONT, 14), command=lambda: close(False), **GHOST)
+        cancel.pack(side="right", padx=(0, 10))
     win.bind("<Escape>", lambda _e: close(False))
     win.protocol("WM_DELETE_WINDOW", lambda: close(False))
     win.update_idletasks()
@@ -612,8 +622,17 @@ class App(ctk.CTk):
             self.state("zoomed")
 
     def _on_ui_error(self, exc_type, exc, tb) -> None:
-        """Last line of defence: a bug in a callback shows a dialog instead of freezing the app."""
-        messagebox.showerror("Something went wrong", f"{exc}\n\nThe app is still running.")
+        """Last line of defence: a bug in a callback is logged and shown instead of freezing the app."""
+        diag.log_exception("window", (exc_type, exc, tb))
+        self._show_error(exc)
+
+    def _show_error(self, exc) -> None:
+        msg = (f"{exc}\n\nThe app is still running. Details are saved on this computer: "
+               "Settings > About > Open log folder.")
+        try:
+            alert(self, "Something went wrong", msg)
+        except Exception:  # the themed dialog itself failed: fall back to the plain one
+            messagebox.showerror("Something went wrong", msg)
 
     # ---------- layout ----------
 
@@ -711,7 +730,21 @@ class App(ctk.CTk):
         for text, url in (("Support", SUPPORT), ("Source code", REPO), ("Website", SITE)):
             ctk.CTkButton(r, text=text, width=100, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
                           command=lambda u=url: webbrowser.open(u), **PLAIN).pack(side="right", padx=(8, 0))
+        r = row(card, "Diagnostics", "Kept on this computer. Nothing is sent. May contain file names.")
+        for text, cmd in (("Copy diagnostics", self.copy_diagnostics), ("Open log folder", self.open_logs)):
+            ctk.CTkButton(r, text=text, width=130, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
+                          command=cmd, **PLAIN).pack(side="right", padx=(8, 0))
         return f
+
+    def open_logs(self) -> None:
+        folder = diag.log_file().parent
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(folder))
+
+    def copy_diagnostics(self) -> None:
+        self.clipboard_clear()
+        self.clipboard_append(diag.report())
+        self.toast("Diagnostics copied. They can contain file names. Paste them into a text editor and read them before you share them.")
 
     def _add_pin(self, picked: str) -> None:
         if not picked:
@@ -936,7 +969,8 @@ class App(ctk.CTk):
         def target():
             try:
                 self._events.put((done, work()))
-            except Exception as e:  # shown in a dialog, never a stack trace
+            except Exception as e:  # shown in a dialog, never a stack trace; the log keeps the traceback
+                diag.log_exception("background job")
                 self._events.put((done, e))
 
         threading.Thread(target=target, daemon=True).start()
@@ -952,13 +986,14 @@ class App(ctk.CTk):
                 self.status.configure(text="")
                 try:
                     if isinstance(result, Exception):
-                        messagebox.showerror("Something went wrong", str(result))
+                        self._show_error(result)
                     elif self._cancel.is_set():
                         self.status.configure(text="Cancelled. Nothing was changed by the scan.")
                     else:
                         done(result)
                 except Exception as e:  # keep the poll loop alive whatever a callback does
-                    messagebox.showerror("Something went wrong", str(e))
+                    diag.log_exception("result handler")
+                    self._show_error(e)
         except queue.Empty:
             pass
         self.after(100, self._poll)
@@ -1009,6 +1044,8 @@ class App(ctk.CTk):
     def _scan_done(self, r) -> None:
         self.entries, moves, dups, large, self.leftovers, redl, empty = r
         self.sizes = {}
+        diag.log_op("scan", files=len(self.entries), to_sort=len(moves), duplicate_copies=sum(len(g.files) - 1 for g in dups),
+                    redownloads=len(redl), large=len(large), leftovers=len(self.leftovers), empty_folders=len(empty))
         self._fill_sort(moves)
         self._fill_dups(dups, redl)
         self._fill_large(large)
@@ -1099,6 +1136,7 @@ class App(ctk.CTk):
             self._run(lambda: core.apply_moves(sel, folder, recent_hours=hours), self._move_done, cancellable=False)
 
     def _move_done(self, result: tuple[int, list[str]]) -> None:
+        diag.log_op("sort", moved=result[0], problems=len(result[1]))
         self._report("Done", f"Moved {plural(result[0], 'file')}.", result[1])
         self._refresh_undo()
         self.scan()
@@ -1114,6 +1152,7 @@ class App(ctk.CTk):
             self._run(core.undo_last, self._undo_done, cancellable=False)
 
     def _undo_done(self, result: tuple[int, list[str]]) -> None:
+        diag.log_op("undo", restored=result[0], problems=len(result[1]))
         self._report("Undo", f"Restored {plural(result[0], 'file')}.", result[1])
         self._refresh_undo()
         self.scan()
@@ -1172,6 +1211,7 @@ class App(ctk.CTk):
             self._run(lambda: core.trash_empty_dirs(paths, folder), self._recycled, cancellable=False)
 
     def _recycled(self, result: tuple[int, list[str]]) -> None:
+        diag.log_op("recycle", sent=result[0], problems=len(result[1]))
         self._report("Done", f"Sent {plural(result[0], 'item')} to the Recycle Bin. Restore them from the Bin if needed.", result[1])
         self.scan()
 
@@ -1209,6 +1249,8 @@ class App(ctk.CTk):
 
 
 def main() -> None:
+    diag.install_hooks()
+    diag.log_op("start")
     app = App()
     if len(sys.argv) > 1:  # a folder given on the command line wins over "reopen last folder"
         app.after(0, lambda: app.set_folder(Path(sys.argv[1])))

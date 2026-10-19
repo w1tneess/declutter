@@ -5,7 +5,8 @@ Safety rules:
 - Sorting moves are logged so the last batch can be undone.
 - Drive roots, the home folder (and its parents), system folders and project folders are refused.
 - Symlinks, junctions, hidden items and cloud-only placeholders are never followed or hashed.
-- Project folders (.git, node_modules, .venv, package.json, *.sln) are never entered.
+- Project folders (.git, .svn, .hg, node_modules, .venv, venv, package.json, pyproject.toml, Cargo.toml, *.sln) and
+  portable-app folders (an .exe and a .dll side by side, below the chosen folder) are never entered.
 - Active downloads and files changed in the last 5 minutes are left alone.
 - Removals only happen on local fixed drives, where the Recycle Bin exists.
 - Every action re-checks the disk right before touching it, because the scan may be stale.
@@ -47,7 +48,8 @@ PROTECTED_DIRS = {
     "$recycle.bin", "system volume information", ".git", "node_modules", "appdata",
 }
 
-PROJECT_MARKERS = {".git", "node_modules", ".venv", "package.json"}  # plus any *.sln
+PROJECT_MARKERS = {".git", ".svn", ".hg", "node_modules", ".venv", "venv", "package.json", "pyproject.toml",
+                   "cargo.toml"}  # plus any *.sln
 PARTIAL_EXTS = {".crdownload", ".part", ".tmp", ".download", ".opdownload", ".!qb"}
 DEAD_EXTS = {".crdownload", ".part"}  # these, once older than DEAD_SECS, are offered as dead downloads
 DEAD_SECS = 3 * 86400
@@ -126,7 +128,7 @@ def check_root(path: str | Path) -> tuple[bool, str]:
         return False, "System or protected folder."
     try:
         if is_project({n.lower() for n in os.listdir(p)}):
-            return False, "This is a project folder (it has .git, node_modules, .venv, package.json or a .sln file)."
+            return False, "This is a project folder (it has .git, package.json, pyproject.toml, a .sln file or similar)."
     except OSError as e:
         return False, str(e)
     return True, ""
@@ -151,6 +153,12 @@ def _is_link_dir(st: os.stat_result) -> bool:
 def is_project(lower_names: set[str]) -> bool:
     """True if a folder holding these (lowercased) names is a code project."""
     return any(n in PROJECT_MARKERS or n.endswith(".sln") for n in lower_names)
+
+
+def is_app_folder(lower_names: set[str]) -> bool:
+    """True if a folder holding these (lowercased) names looks like a portable program: an .exe next to a .dll.
+    Sorting or removing part of it would break it. The folder the user picked is never judged this way."""
+    return any(n.endswith(".exe") for n in lower_names) and any(n.endswith(".dll") for n in lower_names)
 
 
 def _leave_alone(name: str, st: os.stat_result, now: float) -> bool:
@@ -250,26 +258,32 @@ def is_pinned(p: str | Path, pins) -> bool:
 
 
 def walk_files(root: Path, skip_dirs: set[str] | None = None,
-               cancel: CancelFn = None, ignore=()) -> Iterator[Entry]:
+               cancel: CancelFn = None, ignore=(), skipped: list[Path] | None = None) -> Iterator[Entry]:
     """Yield (path, stat) for regular files under root, in one pass.
 
-    Skips symlinks, junctions, hidden, protected and project folders, and files to leave alone
+    Skips symlinks, junctions, hidden, protected, project and portable-app folders, and files to leave alone
     (downloads in progress, just-changed files, cloud placeholders). Stats come from the directory
-    listing, so no extra syscalls are needed by callers.
+    listing, so no extra syscalls are needed by callers. Project and app folders that were not entered
+    are appended to `skipped` when it is given.
     """
     skip = {d.lower() for d in (skip_dirs or ())}
     pins = _pin_keys(ignore)
-    stack = [os.fspath(root)]
+    root_s = os.fspath(root)
+    stack = [root_s]
     now = time.time()
     while stack:
         if cancel and cancel():
             return
+        here = stack.pop()
         try:
-            with os.scandir(stack.pop()) as it:
+            with os.scandir(here) as it:
                 entries = list(it)
         except OSError:
             continue
-        if is_project({e.name.lower() for e in entries}):
+        names = {e.name.lower() for e in entries}
+        if is_project(names) or (here != root_s and is_app_folder(names)):
+            if skipped is not None:
+                skipped.append(Path(here))
             continue
         for e in entries:
             try:
@@ -289,10 +303,12 @@ def walk_files(root: Path, skip_dirs: set[str] | None = None,
                 yield Path(e.path), st
 
 
-def scan_entries(root: str | Path, cancel: CancelFn = None, ignore=()) -> list[Entry]:
+def scan_entries(root: str | Path, cancel: CancelFn = None, ignore=(),
+                 skipped: list[Path] | None = None) -> list[Entry]:
     """One walk of the folder; pass the result to plan_sort / find_duplicates / find_large_old.
-    `ignore` holds pinned files and folders, which are skipped."""
-    return list(walk_files(require_root(root), cancel=cancel, ignore=ignore))
+    `ignore` holds pinned files and folders, which are skipped; `skipped` collects the project and
+    program folders that were left alone."""
+    return list(walk_files(require_root(root), cancel=cancel, ignore=ignore, skipped=skipped))
 
 
 def iter_files(root: Path, skip_dirs: set[str] | None = None,
@@ -806,7 +822,8 @@ def find_empty_dirs(root: str | Path, cancel: CancelFn = None, ignore=()) -> lis
                 entries = list(it)
         except OSError:
             return False
-        if is_project({e.name.lower() for e in entries}):
+        names = {e.name.lower() for e in entries}
+        if is_project(names) or (d != root_s and is_app_folder(names)):
             return False
         is_empty = True
         for e in entries:

@@ -29,7 +29,8 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - Build only what is missing: pin ("Never touch") from the file row, then re-plan without rescanning.
   - Done: a "Never touch" button on each row greys that row out in place ("Pinned", unticked, not counted) and drops the file from the plan (no walk of the folder, no relayout: 22 ms at 300 rows; removing the row cost 225 ms). Other lists update on the next scan; their actions skip pinned files anyway.
 
-## R4. Project and portable-app boundary (delta only)
+## R4. Project and portable-app boundary (delta only) - built, awaiting review
+Decision made while building: the .exe+.dll rule applies to subfolders only. The folder the user picks is never refused for it (Downloads can hold a loose .exe and .dll).
 Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .hg, venv, pyproject.toml, Cargo.toml.
 - Also treat a folder containing both an .exe and a .dll as a portable app: do not enter it. Failure direction is safe (less is offered), but it hides cleanup silently, so:
   - show "Skipped N app/project folders to keep them intact" with a "Show them" link;

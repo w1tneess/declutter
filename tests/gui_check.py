@@ -77,6 +77,10 @@ put("pack/a.txt", b"hello")
 os.utime(small / "pack.zip", (old, old))
 put("docs/report.pdf", b"x" * 1000)
 put("docs/report (1).pdf", b"y" * 1005)
+put("appdir/run.exe", b"MZ app")  # a program folder (.exe next to a .dll) and a project folder: both left alone
+put("appdir/lib.dll", b"MZ lib")
+put("proj/package.json", b"{}")
+put("proj/code.js", b"x")
 for n in ("Screenshot 1.png", "WhatsApp Image 1.jpg", "photo.png", "a.lnk"):
     put(n, n.encode())  # different bytes, so they are not exact duplicates of each other
 n_files = len(files)
@@ -358,6 +362,17 @@ assert app.large.rows[0][0].cget("text").startswith("Likely leftovers (3)"), app
 assert {m.category for m in app.moves} == {"Images/Screenshots", "Images/Chat", "Images", "Archives"}, \
     {m.category for m in app.moves}
 assert "a.lnk" not in {m.src.name for m in app.moves}
+assert sorted(p.name for p in app.skipped) == ["appdir", "proj"], app.skipped
+assert app.skip_row.winfo_manager() and app.skip_label.cget("text") == \
+    "Skipped 2 app/project folders to keep them intact.", app.skip_label.cget("text")
+shown = []
+real_showinfo, A.messagebox.showinfo = A.messagebox.showinfo, lambda title, msg: shown.append(msg)
+app.show_skipped()
+A.messagebox.showinfo = real_showinfo
+assert "appdir" in shown[0] and "proj" in shown[0], shown
+app.show("Home")
+settle(300)
+shoot("skipped_note")
 assert [c[1].copy.name for c in app.dups.copies] == ["report (1).pdf"] and not app.dups.copies[0][0].get()
 assert app.dups.selected() == [], app.dups.selected()
 assert "possible re-download" in app.cards["Duplicates"][2].cget("text"), app.cards["Duplicates"][2].cget("text")
@@ -400,6 +415,8 @@ pump(lambda: not app._busy)
 assert "recent files left alone" in app.sort_hint.cget("text"), app.sort_hint.cget("text")
 assert app.sort.files == [] and app.settings is not None and A.T.load_settings()["recent_hours"] == 24
 print(f"leftovers + re-downloads + sub-buckets + grace period OK, longest UI update {worst * 1000:.0f} ms")
+app.set_folder(big)
+assert not app.skip_row.winfo_manager() and app.skipped == [], "the skipped note belongs to the scanned folder"
 
 # ---- R3: pin a file from its Sort row; its row is removed in place and the plan keeps the rest, no new walk
 many = base / "many"

@@ -193,6 +193,18 @@ assert app._toast.winfo_ismapped()
 shoot("toast")
 settle(1200)
 assert not app._toast.winfo_exists(), "toast must hide itself"
+real_on, A.animations_on = A.animations_on, lambda: False  # Windows "Animation effects" off: no slide at all
+app.toast("Moved 3 files.", ms=600)
+y_first = app._toast.place_info()["y"]
+settle(300)
+assert app._toast.place_info()["y"] == y_first, "with animations off the toast is placed straight away"
+A.animations_on = lambda: True
+app.toast("Moved 3 files.", ms=600)
+y_first = app._toast.place_info()["y"]
+settle(300)
+assert app._toast.place_info()["y"] != y_first, "with animations on it slides"
+A.animations_on = real_on
+settle(900)
 if focus_ok():
     app.event_generate("<Control-Key-2>")
     settle(100)
@@ -204,7 +216,6 @@ if focus_ok():
     print("motion + shortcuts OK")
 else:
     print("motion OK; shortcut keys NOT CHECKED (the window has no OS focus)")
-app.show("Duplicates")
 app.show("Duplicates")
 settle(300)
 assert app.dups.head.winfo_height() <= 2, app.dups.head.winfo_height()
@@ -304,6 +315,7 @@ assert done == [(0, [])] and not any(seen), (done, seen)
 print("non-cancellable job OK")
 
 # ---- screenshots: both themes, 100/125/150 % scaling, all pages, at the minimum window size too
+rings_unchecked = 0
 for scale in (1.0, 1.25, 1.5):
     ctk.set_widget_scaling(scale)
     ctk.set_window_scaling(scale)
@@ -312,6 +324,39 @@ for scale in (1.0, 1.25, 1.5):
         for size in ("1100x720", "860x560"):
             app.geometry(size)
             settle(400)
+            if size == "1100x720":  # keyboard focus rings at 100/125/150 %, both themes: a button and a checkbox
+                app.show("Home")
+                if focus_ok():
+                    app.scan_btn.focus_set()
+                    settle(200)
+                    assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS, \
+                        ("button focus ring", scale, mode)
+                    app.show("Empty Folders")
+                    box = app.empty.rows[0][0]
+                    box.focus_set()
+                    settle(200)
+                    assert "underline" in box.cget("font"), ("checkbox focus ring", scale, mode)
+                    app.focus_set()
+                else:
+                    rings_unchecked += 1
+            if mode == "Light":  # the toast never lands on an action button, whatever the page, size or scale
+                for page in ("Sort", "Duplicates", "Large & Old", "Empty Folders"):
+                    app.show(page)
+                    app.toast("Sent 12 items to the Recycle Bin. Restore them from the Bin if needed.", ms=3000)
+                    settle(450)
+                    t, tab = app._toast, app.pages[page]
+
+                    def box_of(w):
+                        return (w.winfo_rootx(), w.winfo_rooty(), w.winfo_rootx() + w.winfo_width(),
+                                w.winfo_rooty() + w.winfo_height())
+                    tx0, ty0, tx1, ty1 = box_of(t)
+                    for what, w in (("action button", tab.action_btn), ("selection label", tab.sel_label),
+                                    ("status text", app.status)):
+                        bx0, by0, bx1, by1 = box_of(w)
+                        assert tx1 <= bx0 or bx1 <= tx0 or ty1 <= by0 or by1 <= ty0, \
+                            f"toast covers the {page} {what} at {scale} {size}: {(tx0, ty0, tx1, ty1)} vs {(bx0, by0, bx1, by1)}"
+                    assert tx0 >= app.winfo_rootx() and tx1 <= app.winfo_rootx() + app.winfo_width() + 1, (page, size)
+                    t.destroy()
             for page in ("Home", "Duplicates", "Large & Old", "Empty Folders", "Sort", "Settings"):
                 app.show(page)
                 settle(250)
@@ -327,6 +372,8 @@ for scale in (1.0, 1.25, 1.5):
                 app.show("Duplicates")
                 settle(250)
                 shoot(f"{int(scale * 100)}_{mode}_min_Duplicates")
+print("focus rings at 100/125/150 %: " + ("OK" if not rings_unchecked else
+                                          f"NOT CHECKED {rings_unchecked} of 6 times (the window had no OS focus)"))
 ctk.set_widget_scaling(1.0)
 ctk.set_window_scaling(1.0)
 app._set_theme("Light")
@@ -366,10 +413,10 @@ assert sorted(p.name for p in app.skipped) == ["appdir", "proj"], app.skipped
 assert app.skip_row.winfo_manager() and app.skip_label.cget("text") == \
     "Skipped 2 app/project folders to keep them intact.", app.skip_label.cget("text")
 shown = []
-real_showinfo, A.messagebox.showinfo = A.messagebox.showinfo, lambda title, msg: shown.append(msg)
+real_alert, A.alert = A.alert, lambda master, title, msg: shown.append((title, msg))
 app.show_skipped()
-A.messagebox.showinfo = real_showinfo
-assert "appdir" in shown[0] and "proj" in shown[0], shown
+A.alert = real_alert
+assert shown[0][0] == "Skipped folders" and "appdir" in shown[0][1] and "proj" in shown[0][1], shown
 app.show("Home")
 settle(300)
 shoot("skipped_note")

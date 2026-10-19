@@ -115,6 +115,17 @@ def settle(ms=600):
         time.sleep(0.01)
 
 
+def focus_ok() -> bool:
+    """Key and focus events only reach this window while Windows gives it the foreground (not on a locked
+    screen, or while another program is in front). Ask loudly; say whether it worked."""
+    app.attributes("-topmost", True)
+    app.update()
+    app.attributes("-topmost", False)
+    app.focus_force()
+    settle(200)
+    return app.focus_displayof() is not None
+
+
 def shoot(name, win=None):
     win = win or app
     win.attributes("-topmost", True)  # otherwise other windows end up in the picture
@@ -178,15 +189,18 @@ assert app._toast.winfo_ismapped()
 shoot("toast")
 settle(1200)
 assert not app._toast.winfo_exists(), "toast must hide itself"
-app.focus_force()
-app.event_generate("<Control-Key-2>")
-settle(100)
-assert app.current == "Sort", app.current
+if focus_ok():
+    app.event_generate("<Control-Key-2>")
+    settle(100)
+    assert app.current == "Sort", app.current
+    app.show("Duplicates")
+    app.event_generate("<Control-f>")
+    settle(100)
+    assert app.focus_get() is not None and str(app.focus_get()).startswith(str(app.dups.search))
+    print("motion + shortcuts OK")
+else:
+    print("motion OK; shortcut keys NOT CHECKED (the window has no OS focus)")
 app.show("Duplicates")
-app.event_generate("<Control-f>")
-settle(100)
-assert app.focus_get() is not None and str(app.focus_get()).startswith(str(app.dups.search))
-print("motion + shortcuts OK")
 app.show("Duplicates")
 settle(300)
 assert app.dups.head.winfo_height() <= 2, app.dups.head.winfo_height()
@@ -240,26 +254,33 @@ print("pins OK")
 
 # ---- keyboard: Tab focus shows a ring, Space activates, and a focused row scrolls into view
 app.show("Home")
-app.focus_force()  # focus events only fire while this window has the OS focus
-settle(200)
+focus_ok()  # focus events only fire while this window has the OS focus
 app.scan_btn.focus_set()
 settle(100)
-assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS
-app.focus_get().tk_focusNext().focus_set()
-settle(100)
-assert app.scan_btn.cget("border_width") != 2, "ring must go when focus leaves"
+# Focus events only fire while Windows gives this window the foreground. If another program holds it (a locked
+# screen, a window the user is working in), nothing here can be proved: say so loudly instead of failing.
+FOCUS_OK = app.focus_get() is not None
+if not FOCUS_OK:
+    print("SKIPPED keyboard focus checks: the window has no OS focus (run again with the screen unlocked)")
+if FOCUS_OK:
+    assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS, \
+        (app.scan_btn.cget("border_width"), app.focus_get(), app.focus_displayof())
+    app.focus_get().tk_focusNext().focus_set()
+    settle(100)
+    assert app.scan_btn.cget("border_width") != 2, "ring must go when focus leaves"
 app.show("Empty Folders")
 pump(lambda: len(app.empty.rows) == 21)
 settle(300)
 last = app.empty.rows[-1][0]
 last.focus_set()
 settle(300)
-assert "underline" in last.cget("font"), last.cget("font")
-assert app.empty.list._parent_canvas.yview()[0] > 0, "focused row must scroll into view"
-before = app.empty.items[-1][0].get()
-last._text_label.event_generate("<space>")
-assert app.empty.items[-1][0].get() != before, "Space toggles a focused checkbox"
-last._text_label.event_generate("<space>")
+if FOCUS_OK:
+    assert "underline" in last.cget("font"), last.cget("font")
+    assert app.empty.list._parent_canvas.yview()[0] > 0, "focused row must scroll into view"
+    before = app.empty.items[-1][0].get()
+    last._text_label.event_generate("<space>")
+    assert app.empty.items[-1][0].get() != before, "Space toggles a focused checkbox"
+    last._text_label.event_generate("<space>")
 for mode in ("Light", "Dark"):
     app._set_theme(mode)
     settle(300)
@@ -269,7 +290,7 @@ app.scan_btn.focus_set()
 settle(200)
 shoot("focus_button_Light")
 app._set_theme("Light")
-print("keyboard focus OK")
+print("keyboard focus OK" if FOCUS_OK else "keyboard focus NOT CHECKED (no OS focus)")
 
 # ---- actions get no Cancel button, and their result is always reported
 seen, done = [], []
@@ -411,14 +432,18 @@ walks.clear()
 mv = app.sort.files[0][1]
 worst = 0.0
 t0 = time.perf_counter()
-app.pin_move(mv)  # the row goes away at once, with no rebuild of the 300-row list
+app.pin_move(mv)  # the row is greyed out in place: no rebuild, no relayout of the 300-row list
 call_ms = (time.perf_counter() - t0) * 1000
 quiet = time.time() + 0.6
 pump(lambda: time.time() > quiet)  # let Tk redraw, timing each event
 pin_ms = max(call_ms, worst * 1000)
 assert walks == [], "pinning must not walk the folder again"
-assert not app._busy and len(app.sort.files) == 299 and mv.src not in {m.src for _, m, _ in app.sort.files}
-assert buttons_in(app.sort.list, "Never touch") == 299
+assert not app._busy and len(app.sort.files) == 300, "the row stays, greyed out"
+assert buttons_in(app.sort.list, "Never touch") == 299 and buttons_in(app.sort.list, "Pinned") == 1
+assert not app.sort.files[0][0].get() and mv not in app.sort.selected() and len(app.sort.selected()) == 299
+app.sort.select_all(True)
+assert mv not in app.sort.selected() and len(app.sort.selected()) == 299, "Select all must not tick a pinned row"
+assert app.sort.action_btn.cget("text") == "Sort 299 files", app.sort.action_btn.cget("text")
 assert len(app.moves) == 319 and mv.src not in {m.src for m in app.moves}
 headings = [t for t in (c.cget("text") for b in app.sort.list.winfo_children() for c in b.winfo_children()
                         if isinstance(c, ctk.CTkLabel)) if t.startswith("Documents")]
@@ -436,6 +461,59 @@ pump(lambda: not app._busy)
 A.core.scan_entries = real_scan
 assert build_worst < 0.25 and pin_ms < 250, (build_worst, pin_ms)
 print(f"pin from Sort row OK: 300 rows built with longest UI update {build_worst * 1000:.0f} ms, pin took {pin_ms:.0f} ms")
+# ---- diagnostics: operations are logged, About has two buttons, errors are logged and shown in the themed dialog
+from declutter import __version__, diag  # noqa: E402
+log = "\n".join(diag.recent_lines(500))
+for op in ("op=scan", "op=sort", "op=undo", "op=recycle"):
+    assert op in log, (op, log[-600:])
+buttons = []
+walk = lambda w: [buttons.append(w.cget("text")) if isinstance(w, ctk.CTkButton) else None] and [walk(c) for c in w.winfo_children()]  # noqa: E731
+walk(app.pages["Settings"])
+assert "Open log folder" in buttons and "Copy diagnostics" in buttons, buttons
+found = {}
+find = lambda w: [found.update({w.cget("text"): w}) if isinstance(w, ctk.CTkButton) else None] and [find(c) for c in w.winfo_children()]  # noqa: E731
+find(app.pages["Settings"])
+app.show("Settings")
+for mode in ("Light", "Dark"):
+    app._set_theme(mode)
+    settle(300)
+    app.pages["Settings"]._parent_canvas.yview_moveto(1)  # the About card is at the bottom
+    settle(300)
+    for name in ("Copy diagnostics", "Open log folder"):
+        b = found[name]
+        assert b.winfo_ismapped() and not clipped(b) and b.winfo_rooty() >= app.winfo_rooty(), \
+            (mode, name, b.winfo_ismapped(), clipped(b), b.winfo_rooty(), app.winfo_rooty(), app.winfo_height(),
+             app.pages["Settings"]._parent_canvas.yview())
+    shoot(f"about_{mode}")
+opened = []
+A.os.startfile = opened.append
+app.open_logs()
+assert opened == [str(diag.log_file().parent)] and diag.log_file().parent.is_dir(), opened
+app.copy_diagnostics()
+clip = app.clipboard_get()
+assert f"Declutter {__version__}" in clip and "op=scan" in clip, clip[:300]
+alerts = []
+real_alert, A.alert = A.alert, lambda master, title, message: alerts.append((title, message))
+app._on_ui_error(ValueError, ValueError("kaboom"), None)
+assert alerts[-1][0] == "Something went wrong" and "kaboom" in alerts[-1][1] and "Open log folder" in alerts[-1][1], alerts
+assert "ValueError: kaboom" in "\n".join(diag.recent_lines(500))
+app._run(lambda: 1 / 0, lambda r: None, cancellable=False)
+pump(lambda: len(alerts) == 2)
+assert "division by zero" in alerts[-1][1] and "ZeroDivisionError" in "\n".join(diag.recent_lines(500)), alerts
+A.alert = real_alert
+A.confirm = real_confirm  # the real dialog, for the screenshots
+for mode in ("Light", "Dark"):
+    app._set_theme(mode)
+    settle(300)
+    tops = []
+    app.after(700, lambda m=mode: (shoot(f"alert_{m}", [w for w in app.winfo_children()
+                                                       if isinstance(w, ctk.CTkToplevel)][-1]),
+                                   tops.append(1),
+                                   [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)][-1]
+                                   .event_generate("<Escape>")))
+    A.alert(app, "Something went wrong", "Example error text.\n\nThe app is still running.")
+    assert tops
+print("diagnostics OK")
 app._set_theme("System")
 app.destroy()
 

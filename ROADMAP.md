@@ -17,7 +17,7 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - core.peek_undo() returns folder, file count and age of the last sort. The Undo confirmation says: "Undo the sort of 14 files in Downloads (5 minutes ago)?" Test peek_undo headless.
 - UI copy never says "safe to delete". Say "likely leftover".
 
-## R2. Diagnostics (needed before real users)
+## R2. Diagnostics (needed before real users) - built, awaiting review
 - Rotating log at %LOCALAPPDATA%\Declutter\logs\declutter.log: operation type, counts, and full tracebacks. No file contents. Nothing is sent anywhere.
 - Settings > About: "Open log folder" and "Copy diagnostics" (app version, Windows version, last 200 log lines). The user reads it before sharing.
 - Unhandled exceptions in the Tk callback and in worker threads are logged and shown in the themed dialog.
@@ -27,7 +27,7 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - Audit first: can the user already see every file that will move and untick or pin one from its row? M3 reported per-file sort as working, so do not rebuild it.
   - Audit result: every file that will move is listed under its destination folder, ticked, with Select all/none and a filter; at most 300 rows are shown and only shown rows move. Missing: pin from the row.
 - Build only what is missing: pin ("Never touch") from the file row, then re-plan without rescanning.
-  - Done: a "Never touch" button on each row removes that row in place and keeps the rest of the plan (no walk of the folder). Other lists update on the next scan; their actions skip pinned files anyway.
+  - Done: a "Never touch" button on each row greys that row out in place ("Pinned", unticked, not counted) and drops the file from the plan (no walk of the folder, no relayout: 22 ms at 300 rows; removing the row cost 225 ms). Other lists update on the next scan; their actions skip pinned files anyway.
 
 ## R4. Project and portable-app boundary (delta only)
 Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .hg, venv, pyproject.toml, Cargo.toml.

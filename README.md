@@ -19,6 +19,7 @@ Uninstall from Windows Settings > Apps. Website source is in `website/` (deploye
 - **Filter by name** on each list. Only the rows you can see count as selected, so nothing hidden is ever removed.
 - **Double-click** a file or folder to see it in Explorer (it is never opened).
 - **Settings**: theme (System, Light, Dark), reopen the last folder at start, the Large & old filters, and a "Never touch" list of pinned files and folders, all remembered.
+- **Diagnostics**: a small log (operations, counts and error details, which can include a file name but never file contents) is kept in `%LOCALAPPDATA%\Declutter\logs`. Settings > About has **Open log folder** and **Copy diagnostics**, a text you can read before you share it. Nothing is sent anywhere.
 - **Right-click a folder > Tidy with Declutter** (optional when installing) opens the app on that folder. `Declutter.exe <folder>` does the same.
 
 ![Duplicates, light theme](site/screenshot-duplicates.png)

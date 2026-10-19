@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import gc
+import os
 import queue
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from typing import Callable
 
 import customtkinter as ctk
 
-from . import __version__, core, theme as T
+from . import __version__, core, diag, theme as T
 from .theme import FONT
 
 SITE = "https://w1tneess.github.io/declutter/"
@@ -177,8 +178,14 @@ def reveal(p: Path) -> None:
         subprocess.Popen(f'explorer /select,"{p}"')
 
 
-def confirm(master, title: str, message: str, ok_text: str) -> bool:
-    """Modal confirm dialog in the app's theme. Cancel is the default; Esc cancels."""
+def alert(master, title: str, message: str) -> None:
+    """Modal message with one OK button, in the app's theme. Esc closes it."""
+    confirm(master, title, message, "OK", cancel_text=None)
+
+
+def confirm(master, title: str, message: str, ok_text: str, cancel_text: str | None = "Cancel") -> bool:
+    """Modal confirm dialog in the app's theme. Cancel is the default; Esc cancels.
+    Without a cancel_text there is only the OK button (see alert)."""
     win = ctk.CTkToplevel(master, fg_color=T.BG)
     win.title(title)
     win.resizable(False, False)
@@ -197,11 +204,14 @@ def confirm(master, title: str, message: str, ok_text: str) -> bool:
                  wraplength=420).pack(anchor="w", padx=T.GAP + 4)
     row = ctk.CTkFrame(card, fg_color="transparent")
     row.pack(fill="x", padx=T.GAP + 4, pady=T.GAP + 4)
-    ctk.CTkButton(row, text=ok_text, height=38, corner_radius=T.R_BUTTON, font=(FONT, 14, "bold"),
-                  command=lambda: close(True), **PRIMARY).pack(side="right")
-    cancel = ctk.CTkButton(row, text="Cancel", width=90, height=38, corner_radius=T.R_BUTTON, font=(FONT, 14),
-                           command=lambda: close(False), **GHOST)
-    cancel.pack(side="right", padx=(0, 10))
+    ok = ctk.CTkButton(row, text=ok_text, height=38, corner_radius=T.R_BUTTON, font=(FONT, 14, "bold"),
+                       command=lambda: close(True), **PRIMARY)
+    ok.pack(side="right")
+    cancel = ok  # with no Cancel button, OK is the safe default
+    if cancel_text:
+        cancel = ctk.CTkButton(row, text=cancel_text, width=90, height=38, corner_radius=T.R_BUTTON,
+                               font=(FONT, 14), command=lambda: close(False), **GHOST)
+        cancel.pack(side="right", padx=(0, 10))
     win.bind("<Escape>", lambda _e: close(False))
     win.protocol("WM_DELETE_WINDOW", lambda: close(False))
     win.update_idletasks()
@@ -486,14 +496,38 @@ class SortTab(Tab):
     """A box per type folder with a checkbox per file. The filter shows or hides whole boxes,
     and everything in a shown box is visible, so only visible files can be selected."""
 
-    def __init__(self, master, on_action):
+    def __init__(self, master, on_action, on_pin):
         self.files: list[tuple[ctk.BooleanVar, core.Move, int]] = []  # (ticked, move, index of its box row)
+        self.on_pin = on_pin  # called with a Move when its row's "Never touch" is pressed
+        self._boxes: dict[str, tuple[ctk.CTkLabel, list[core.Move]]] = {}  # category -> (its heading, its moves)
+        self._lines: dict[int, ctk.CTkFrame] = {}  # id(move) -> its row
+        self._pinned: set[int] = set()  # id(move) of rows greyed out by "Never touch"
         super().__init__(master, "Sort by type", "Sort files", on_action, size_of=lambda m: m.size,
                          subtitle=HELP["Sort"])
 
     def _reset(self) -> None:
         self.files = []
+        self._boxes = {}
+        self._lines = {}
+        self._pinned = set()
         super()._reset()
+
+    @staticmethod
+    def _heading(cat: str, ms: list[core.Move]) -> str:
+        return f"{cat} · {plural(len(ms), 'file')} · {core.human_size(sum(m.size for m in ms))}"
+
+    def mark_pinned(self, mv: core.Move) -> None:
+        """Grey one row out in place (it was pinned): unticked, disabled, left out of the count and the sort.
+        Taking the row out instead makes Tk lay the other rows out again, a stall of about 0.2 s at 300 rows."""
+        label, ms = self._boxes[mv.category]
+        self._pinned.add(id(mv))
+        for v, m, _ in self.files:
+            if m is mv:
+                v.set(False)
+        for c in self._lines[id(mv)].winfo_children():
+            c.configure(state="disabled", **({} if isinstance(c, ctk.CTkCheckBox) else {"text": "Pinned"}))
+        label.configure(text=self._heading(mv.category, [m for m in ms if id(m) not in self._pinned]))
+        self.update_selection()
 
     def set_moves(self, moves: list[core.Move]) -> None:
         if not moves:
@@ -515,23 +549,28 @@ class SortTab(Tab):
             if isinstance(item, str):
                 ms = by_cat[item]
                 b = box["now"] = ctk.CTkFrame(self.list, corner_radius=T.R_BUTTON, fg_color=T.SURFACE_ALT)
-                ctk.CTkLabel(b, text=f"{item} · {plural(len(ms), 'file')} · {core.human_size(sum(m.size for m in ms))}",
-                             font=(FONT, 15, "bold"), text_color=T.TEXT).pack(anchor="w", padx=12, pady=(8, 2))
+                label = ctk.CTkLabel(b, text=self._heading(item, ms), font=(FONT, 15, "bold"), text_color=T.TEXT)
+                label.pack(anchor="w", padx=12, pady=(8, 2))
+                self._boxes[item] = (label, ms)
                 self._add_row(b, " ".join([item] + [m.src.name for m in ms]), fill="x", padx=6, pady=6)
                 return
             v = ctk.BooleanVar(value=True)
             self.files.append((v, item, len(self.rows) - 1))
-            cb = ctk.CTkCheckBox(box["now"], text=item.src.name, variable=v, font=(FONT, 14), text_color=T.TEXT,
+            line = self._lines[id(item)] = ctk.CTkFrame(box["now"], fg_color="transparent")
+            line.pack(fill="x", padx=(28, 12), pady=(3, 6))
+            cb = ctk.CTkCheckBox(line, text=item.src.name, variable=v, font=(FONT, 14), text_color=T.TEXT,
                                  fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
                                  checkmark_color=T.ON_ACCENT, command=self.update_selection)
             cb.bind("<Double-Button-1>", lambda _e, p=item.src: reveal(p))
-            cb.pack(anchor="w", padx=28, pady=(3, 6))
+            cb.pack(side="left")
+            ctk.CTkButton(line, text="Never touch", width=96, height=26, corner_radius=T.R_BUTTON, font=(FONT, 12),
+                          command=lambda m=item: self.on_pin(m), **PLAIN).pack(side="right")
 
-        self._build_chunked(flat, make)
+        self._build_chunked(flat, make, chunk=6)  # each row has three widgets; 12 at a time froze the window
 
     def _visible(self) -> list[tuple[ctk.BooleanVar, core.Move]]:
         shown = self._shown()
-        return [(v, m) for v, m, i in self.files if shown[i]]
+        return [(v, m) for v, m, i in self.files if shown[i] and id(m) not in self._pinned]
 
     def select_all(self, on: bool) -> None:
         for v, _ in self._visible():
@@ -578,7 +617,7 @@ class App(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
         self._build_sidebar()
         self.pages: dict[str, ctk.CTkFrame] = {"Home": self._build_home()}
-        self.sort = SortTab(self, self.move)
+        self.sort = SortTab(self, self.move, self.pin_move)
         self._build_sort_header()
         self.dups = DupTab(self, self.remove_dups, size_of=self._size)
         self.large = Tab(self, "Large & old files", "Send to Recycle Bin",
@@ -612,8 +651,17 @@ class App(ctk.CTk):
             self.state("zoomed")
 
     def _on_ui_error(self, exc_type, exc, tb) -> None:
-        """Last line of defence: a bug in a callback shows a dialog instead of freezing the app."""
-        messagebox.showerror("Something went wrong", f"{exc}\n\nThe app is still running.")
+        """Last line of defence: a bug in a callback is logged and shown instead of freezing the app."""
+        diag.log_exception("window", (exc_type, exc, tb))
+        self._show_error(exc)
+
+    def _show_error(self, exc) -> None:
+        msg = (f"{exc}\n\nThe app is still running. Details are saved on this computer: "
+               "Settings > About > Open log folder.")
+        try:
+            alert(self, "Something went wrong", msg)
+        except Exception:  # the themed dialog itself failed: fall back to the plain one
+            messagebox.showerror("Something went wrong", msg)
 
     # ---------- layout ----------
 
@@ -711,7 +759,21 @@ class App(ctk.CTk):
         for text, url in (("Support", SUPPORT), ("Source code", REPO), ("Website", SITE)):
             ctk.CTkButton(r, text=text, width=100, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
                           command=lambda u=url: webbrowser.open(u), **PLAIN).pack(side="right", padx=(8, 0))
+        r = row(card, "Diagnostics", "Kept on this computer. Nothing is sent. May contain file names.")
+        for text, cmd in (("Copy diagnostics", self.copy_diagnostics), ("Open log folder", self.open_logs)):
+            ctk.CTkButton(r, text=text, width=130, height=34, corner_radius=T.R_BUTTON, font=(FONT, 14),
+                          command=cmd, **PLAIN).pack(side="right", padx=(8, 0))
         return f
+
+    def open_logs(self) -> None:
+        folder = diag.log_file().parent
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(folder))
+
+    def copy_diagnostics(self) -> None:
+        self.clipboard_clear()
+        self.clipboard_append(diag.report())
+        self.toast("Diagnostics copied. They can contain file names. Paste them into a text editor and read them before you share them.")
 
     def _add_pin(self, picked: str) -> None:
         if not picked:
@@ -720,10 +782,25 @@ class App(ctk.CTk):
         if not core.is_pinned(p, self.pins):
             self._set_pins(self.pins + [p])
 
-    def _set_pins(self, pins: list[str]) -> None:
+    def pin_move(self, mv: core.Move) -> None:
+        """"Never touch" on a Sort row: save the pin, drop the file from the last scan and the sort plan (no new
+        walk), and grey its row out. The other lists update on the next scan; their actions skip pins anyway."""
+        if self._busy:
+            return self.status.configure(text="Still working. Please wait a moment.")
+        p = str(mv.src.resolve())
+        if not core.is_pinned(p, self.pins):
+            self._set_pins(self.pins + [p], rescan=False)
+        self.entries = [(q, st) for q, st in self.entries if not core.is_pinned(q, self.pins)]
+        self.toast(f"{mv.src.name} is on your Never touch list. Remove it in Settings.")
+        self.moves.remove(mv)
+        self.sort.mark_pinned(mv)
+
+    def _set_pins(self, pins: list[str], rescan: bool = True) -> None:
         self.pins = pins
         T.save_settings(pins=pins)
         self._fill_pins()
+        if not rescan:
+            return
         if self.entries is not None and not self._busy:
             self.scan()  # refresh results so pinned items disappear from the lists
         elif self.entries is not None:
@@ -960,7 +1037,8 @@ class App(ctk.CTk):
         def target():
             try:
                 self._events.put((done, work()))
-            except Exception as e:  # shown in a dialog, never a stack trace
+            except Exception as e:  # shown in a dialog, never a stack trace; the log keeps the traceback
+                diag.log_exception("background job")
                 self._events.put((done, e))
 
         threading.Thread(target=target, daemon=True).start()
@@ -976,13 +1054,14 @@ class App(ctk.CTk):
                 self.status.configure(text="")
                 try:
                     if isinstance(result, Exception):
-                        messagebox.showerror("Something went wrong", str(result))
+                        self._show_error(result)
                     elif self._cancel.is_set():
                         self.status.configure(text="Cancelled. Nothing was changed by the scan.")
                     else:
                         done(result)
                 except Exception as e:  # keep the poll loop alive whatever a callback does
-                    messagebox.showerror("Something went wrong", str(e))
+                    diag.log_exception("result handler")
+                    self._show_error(e)
         except queue.Empty:
             pass
         self.after(100, self._poll)
@@ -1035,6 +1114,8 @@ class App(ctk.CTk):
         self.entries, moves, dups, large, self.leftovers, redl, empty, self.skipped = r
         self._show_skipped_note()
         self.sizes = {}
+        diag.log_op("scan", files=len(self.entries), to_sort=len(moves), duplicate_copies=sum(len(g.files) - 1 for g in dups),
+                    redownloads=len(redl), large=len(large), leftovers=len(self.leftovers), empty_folders=len(empty))
         self._fill_sort(moves)
         self._fill_dups(dups, redl)
         self._fill_large(large)
@@ -1125,6 +1206,7 @@ class App(ctk.CTk):
             self._run(lambda: core.apply_moves(sel, folder, recent_hours=hours), self._move_done, cancellable=False)
 
     def _move_done(self, result: tuple[int, list[str]]) -> None:
+        diag.log_op("sort", moved=result[0], problems=len(result[1]))
         self._report("Done", f"Moved {plural(result[0], 'file')}.", result[1])
         self._refresh_undo()
         self.scan()
@@ -1140,6 +1222,7 @@ class App(ctk.CTk):
             self._run(core.undo_last, self._undo_done, cancellable=False)
 
     def _undo_done(self, result: tuple[int, list[str]]) -> None:
+        diag.log_op("undo", restored=result[0], problems=len(result[1]))
         self._report("Undo", f"Restored {plural(result[0], 'file')}.", result[1])
         self._refresh_undo()
         self.scan()
@@ -1198,6 +1281,7 @@ class App(ctk.CTk):
             self._run(lambda: core.trash_empty_dirs(paths, folder), self._recycled, cancellable=False)
 
     def _recycled(self, result: tuple[int, list[str]]) -> None:
+        diag.log_op("recycle", sent=result[0], problems=len(result[1]))
         self._report("Done", f"Sent {plural(result[0], 'item')} to the Recycle Bin. Restore them from the Bin if needed.", result[1])
         self.scan()
 
@@ -1235,6 +1319,8 @@ class App(ctk.CTk):
 
 
 def main() -> None:
+    diag.install_hooks()
+    diag.log_op("start")
     app = App()
     if len(sys.argv) > 1:  # a folder given on the command line wins over "reopen last folder"
         app.after(0, lambda: app.set_folder(Path(sys.argv[1])))

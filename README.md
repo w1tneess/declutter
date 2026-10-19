@@ -12,13 +12,14 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 Uninstall from Windows Settings > Apps. Website source is in `website/` (deployed with Vercel, see `vercel.json`).
 
 ## What it does
-- **Sort by type**: moves loose files (top level only) into Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Screenshots (`Screenshot*`, `Snip*`, `Capture*`) go to Images/Screenshots and WhatsApp pictures (`IMG-########-WA####`, `WhatsApp Image*`) to Images/Chat. Shortcuts and config files (`.lnk`, `.url`, `.ini`) are never moved. Files you touched in the last 24 hours (setting, 0 to 72, on the Sort screen) are left alone, judged by the later of modified and created time, so a fresh copy of an old file counts as new. Undo supported.
+- **Sort by type**: moves loose files (top level only) into Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Screenshots (`Screenshot*`, `Snip*`, `Capture*`) go to Images/Screenshots and WhatsApp pictures (`IMG-########-WA####`, `WhatsApp Image*`) to Images/Chat. Shortcuts and config files (`.lnk`, `.url`, `.ini`) are never moved. Files you touched in the last 24 hours (setting, 0 to 72, on the Sort screen) are left alone, judged by the later of modified and created time, so a fresh copy of an old file counts as new. Every file is listed and ticked; untick it, or press **Never touch** on its row to pin it. Undo supported.
 - **Duplicates**: finds identical files (size, then the first and last 64 KB, then SHA-256). Keeps the oldest copy unless you choose another. A separate **Possible re-downloads** section lists `name (1).ext` / `name - Copy.ext` next to `name.ext` when the size is within 2 %; nothing there is ticked for you and the original always stays.
 - **Large & old**: finds big or long-untouched files. A **Likely leftovers** group at the top (never ticked for you, and not a promise they are safe) lists zips whose every file already sits, at the same size, in a same-named folder beside them; installers (`.exe` `.msi` `.iso`) over 7 days old in your Downloads folder; and `.crdownload` / `.part` files over 3 days old.
 - **Empty folders**: finds folders with no files at any depth.
 - **Filter by name** on each list. Only the rows you can see count as selected, so nothing hidden is ever removed.
 - **Double-click** a file or folder to see it in Explorer (it is never opened).
 - **Settings**: theme (System, Light, Dark), reopen the last folder at start, the Large & old filters, and a "Never touch" list of pinned files and folders, all remembered.
+- **Diagnostics**: a small log (operations, counts and error details, which can include a file name but never file contents) is kept in `%LOCALAPPDATA%\Declutter\logs`. Settings > About has **Open log folder** and **Copy diagnostics**, a text you can read before you share it. Nothing is sent anywhere.
 - **Right-click a folder > Tidy with Declutter** (optional when installing) opens the app on that folder. `Declutter.exe <folder>` does the same.
 
 ![Duplicates, light theme](site/screenshot-duplicates.png)

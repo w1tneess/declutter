@@ -379,6 +379,63 @@ pump(lambda: not app._busy)
 assert "recent files left alone" in app.sort_hint.cget("text"), app.sort_hint.cget("text")
 assert app.sort.files == [] and app.settings is not None and A.T.load_settings()["recent_hours"] == 24
 print(f"leftovers + re-downloads + sub-buckets + grace period OK, longest UI update {worst * 1000:.0f} ms")
+
+# ---- R3: pin a file from its Sort row; its row is removed in place and the plan keeps the rest, no new walk
+many = base / "many"
+many.mkdir()
+for i in range(320):
+    f = many / f"note{i:03}.txt"
+    f.write_bytes(f"note {i}".encode())
+    os.utime(f, (old, old))
+walks = []
+real_scan = A.core.scan_entries
+A.core.scan_entries = lambda *a, **k: (walks.append(1), real_scan(*a, **k))[1]
+app.recent_text.set("0")
+app._set_recent()
+pump(lambda: not app._busy)
+app.set_folder(many)
+worst = 0.0
+app.scan()
+pump(lambda: not app._busy and app.entries is not None)
+pump(lambda: len(app.sort.files) == 300)  # 320 files, capped at 300 rows
+buttons_in = lambda w, text: int(isinstance(w, ctk.CTkButton) and w.cget("text") == text) + sum(  # noqa: E731
+    buttons_in(c, text) for c in w.winfo_children())
+assert buttons_in(app.sort.list, "Never touch") == 300, buttons_in(app.sort.list, "Never touch")
+app.show("Sort")
+for mode in ("Light", "Dark"):
+    app._set_theme(mode)
+    settle(300)
+    shoot(f"sort_rows_{mode}")
+build_worst = worst
+walks.clear()
+mv = app.sort.files[0][1]
+worst = 0.0
+t0 = time.perf_counter()
+app.pin_move(mv)  # the row goes away at once, with no rebuild of the 300-row list
+call_ms = (time.perf_counter() - t0) * 1000
+quiet = time.time() + 0.6
+pump(lambda: time.time() > quiet)  # let Tk redraw, timing each event
+pin_ms = max(call_ms, worst * 1000)
+assert walks == [], "pinning must not walk the folder again"
+assert not app._busy and len(app.sort.files) == 299 and mv.src not in {m.src for _, m, _ in app.sort.files}
+assert buttons_in(app.sort.list, "Never touch") == 299
+assert len(app.moves) == 319 and mv.src not in {m.src for m in app.moves}
+headings = [t for t in (c.cget("text") for b in app.sort.list.winfo_children() for c in b.winfo_children()
+                        if isinstance(c, ctk.CTkLabel)) if t.startswith("Documents")]
+assert len(headings) == 1 and headings[0].startswith("Documents · 299 files"), headings
+assert str(mv.src.resolve()) in A.T.load_settings()["pins"] and mv.src.exists()
+A.confirm = lambda *a: True
+app.move()
+pump(lambda: not app._busy)
+pump(lambda: not app._busy and app.entries is not None)
+assert mv.src.exists() and not (many / "Documents" / mv.src.name).exists(), "a pinned file is never moved"
+moved = len(list((many / "Documents").iterdir()))
+assert moved == 299, (moved, len(list(many.iterdir())), app.status.cget("text"))
+app._set_pins([])
+pump(lambda: not app._busy)
+A.core.scan_entries = real_scan
+assert build_worst < 0.25 and pin_ms < 250, (build_worst, pin_ms)
+print(f"pin from Sort row OK: 300 rows built with longest UI update {build_worst * 1000:.0f} ms, pin took {pin_ms:.0f} ms")
 app._set_theme("System")
 app.destroy()
 

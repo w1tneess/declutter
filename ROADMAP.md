@@ -23,9 +23,11 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - Unhandled exceptions in the Tk callback and in worker threads are logged and shown in the themed dialog.
 - Why: the app currently has no logging, so a crash on a friend's PC cannot be diagnosed.
 
-## R3. Sort preview audit, then gaps only
+## R3. Sort preview audit, then gaps only - built, awaiting review
 - Audit first: can the user already see every file that will move and untick or pin one from its row? M3 reported per-file sort as working, so do not rebuild it.
+  - Audit result: every file that will move is listed under its destination folder, ticked, with Select all/none and a filter; at most 300 rows are shown and only shown rows move. Missing: pin from the row.
 - Build only what is missing: pin ("Never touch") from the file row, then re-plan without rescanning.
+  - Done: a "Never touch" button on each row removes that row in place and keeps the rest of the plan (no walk of the folder). Other lists update on the next scan; their actions skip pinned files anyway.
 
 ## R4. Project and portable-app boundary (delta only)
 Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .hg, venv, pyproject.toml, Cargo.toml.
@@ -34,6 +36,7 @@ Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .
   - tests: a project folder, a portable-app folder, and a plain folder with only an .exe.
 
 ## R5. UI backlog
+- Rebuilding a 300-row list blocks the window (measured: about 0.4 s in the real event loop on main, Sort tab, after a sort, a rescan or a grace-period change). CustomTkinter makes and destroys about three widgets per row. Tried chunked destroying: worse (about 1 s). Options: fewer widgets per row, a lower row cap, or a canvas-drawn list.
 - Toast must not overlap the primary action button (anchor it left/centre of the status bar).
 - One themed alert() dialog replacing the remaining native messageboxes.
 - Every new transition respects the Windows animation setting; focus rings at 100/125/150%.

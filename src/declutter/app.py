@@ -486,14 +486,36 @@ class SortTab(Tab):
     """A box per type folder with a checkbox per file. The filter shows or hides whole boxes,
     and everything in a shown box is visible, so only visible files can be selected."""
 
-    def __init__(self, master, on_action):
+    def __init__(self, master, on_action, on_pin):
         self.files: list[tuple[ctk.BooleanVar, core.Move, int]] = []  # (ticked, move, index of its box row)
+        self.on_pin = on_pin  # called with a Move when its row's "Never touch" is pressed
+        self._boxes: dict[str, tuple[ctk.CTkLabel, list[core.Move]]] = {}  # category -> (its heading, its moves)
+        self._lines: dict[int, ctk.CTkFrame] = {}  # id(move) -> its row
         super().__init__(master, "Sort by type", "Sort files", on_action, size_of=lambda m: m.size,
                          subtitle=HELP["Sort"])
 
     def _reset(self) -> None:
         self.files = []
+        self._boxes = {}
+        self._lines = {}
         super()._reset()
+
+    @staticmethod
+    def _heading(cat: str, ms: list[core.Move]) -> str:
+        return f"{cat} · {plural(len(ms), 'file')} · {core.human_size(sum(m.size for m in ms))}"
+
+    def drop(self, mv: core.Move) -> bool:
+        """Take one file's row out in place (it was pinned) without rebuilding the list, which freezes the window
+        for 300 rows. False, and nothing changed, if its box would be left empty: rebuild the list then."""
+        label, ms = self._boxes[mv.category]
+        if len(ms) < 2 or id(mv) not in self._lines:
+            return False
+        ms.remove(mv)
+        self._lines.pop(id(mv)).destroy()
+        self.files = [f for f in self.files if f[1] is not mv]
+        label.configure(text=self._heading(mv.category, ms))
+        self.update_selection()
+        return True
 
     def set_moves(self, moves: list[core.Move]) -> None:
         if not moves:
@@ -515,19 +537,24 @@ class SortTab(Tab):
             if isinstance(item, str):
                 ms = by_cat[item]
                 b = box["now"] = ctk.CTkFrame(self.list, corner_radius=T.R_BUTTON, fg_color=T.SURFACE_ALT)
-                ctk.CTkLabel(b, text=f"{item} · {plural(len(ms), 'file')} · {core.human_size(sum(m.size for m in ms))}",
-                             font=(FONT, 15, "bold"), text_color=T.TEXT).pack(anchor="w", padx=12, pady=(8, 2))
+                label = ctk.CTkLabel(b, text=self._heading(item, ms), font=(FONT, 15, "bold"), text_color=T.TEXT)
+                label.pack(anchor="w", padx=12, pady=(8, 2))
+                self._boxes[item] = (label, ms)
                 self._add_row(b, " ".join([item] + [m.src.name for m in ms]), fill="x", padx=6, pady=6)
                 return
             v = ctk.BooleanVar(value=True)
             self.files.append((v, item, len(self.rows) - 1))
-            cb = ctk.CTkCheckBox(box["now"], text=item.src.name, variable=v, font=(FONT, 14), text_color=T.TEXT,
+            line = self._lines[id(item)] = ctk.CTkFrame(box["now"], fg_color="transparent")
+            line.pack(fill="x", padx=(28, 12), pady=(3, 6))
+            cb = ctk.CTkCheckBox(line, text=item.src.name, variable=v, font=(FONT, 14), text_color=T.TEXT,
                                  fg_color=T.ACCENT, hover_color=T.ACCENT_HOVER, border_color=T.BORDER_CONTROL,
                                  checkmark_color=T.ON_ACCENT, command=self.update_selection)
             cb.bind("<Double-Button-1>", lambda _e, p=item.src: reveal(p))
-            cb.pack(anchor="w", padx=28, pady=(3, 6))
+            cb.pack(side="left")
+            ctk.CTkButton(line, text="Never touch", width=96, height=26, corner_radius=T.R_BUTTON, font=(FONT, 12),
+                          command=lambda m=item: self.on_pin(m), **PLAIN).pack(side="right")
 
-        self._build_chunked(flat, make)
+        self._build_chunked(flat, make, chunk=6)  # each row has three widgets; 12 at a time froze the window
 
     def _visible(self) -> list[tuple[ctk.BooleanVar, core.Move]]:
         shown = self._shown()
@@ -578,7 +605,7 @@ class App(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
         self._build_sidebar()
         self.pages: dict[str, ctk.CTkFrame] = {"Home": self._build_home()}
-        self.sort = SortTab(self, self.move)
+        self.sort = SortTab(self, self.move, self.pin_move)
         self._build_sort_header()
         self.dups = DupTab(self, self.remove_dups, size_of=self._size)
         self.large = Tab(self, "Large & old files", "Send to Recycle Bin",
@@ -720,10 +747,27 @@ class App(ctk.CTk):
         if not core.is_pinned(p, self.pins):
             self._set_pins(self.pins + [p])
 
-    def _set_pins(self, pins: list[str]) -> None:
+    def pin_move(self, mv: core.Move) -> None:
+        """"Never touch" on a Sort row: save the pin, drop its files from the last scan and re-plan the sort
+        from what is left (no new walk). The other lists update on the next scan; their actions skip pins anyway."""
+        if self._busy:
+            return self.status.configure(text="Still working. Please wait a moment.")
+        p = str(mv.src.resolve())
+        if not core.is_pinned(p, self.pins):
+            self._set_pins(self.pins + [p], rescan=False)
+        self.entries = [(q, st) for q, st in self.entries if not core.is_pinned(q, self.pins)]
+        self.toast(f"{mv.src.name} is on your Never touch list. Remove it in Settings.")
+        if self.sort.drop(mv):
+            self.moves.remove(mv)
+        else:
+            self._replan()
+
+    def _set_pins(self, pins: list[str], rescan: bool = True) -> None:
         self.pins = pins
         T.save_settings(pins=pins)
         self._fill_pins()
+        if not rescan:
+            return
         if self.entries is not None and not self._busy:
             self.scan()  # refresh results so pinned items disappear from the lists
         elif self.entries is not None:

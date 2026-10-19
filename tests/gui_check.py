@@ -326,19 +326,24 @@ for scale in (1.0, 1.25, 1.5):
             settle(400)
             if size == "1100x720":  # keyboard focus rings at 100/125/150 %, both themes: a button and a checkbox
                 app.show("Home")
+                # A ring can only show while the window really has the focus; Windows may take it away at any
+                # moment (another program in front), so look at the focus right before each assertion.
+                ring_checked = False
                 if focus_ok():
                     app.scan_btn.focus_set()
                     settle(200)
-                    assert app.scan_btn.cget("border_width") == 2 and app.scan_btn.cget("border_color") == A.T.FOCUS, \
-                        ("button focus ring", scale, mode)
-                    app.show("Empty Folders")
-                    box = app.empty.rows[0][0]
-                    box.focus_set()
-                    settle(200)
-                    assert "underline" in box.cget("font"), ("checkbox focus ring", scale, mode)
-                    app.focus_set()
-                else:
-                    rings_unchecked += 1
+                    if app.focus_get() is not None:
+                        assert app.scan_btn.cget("border_width") == 2 and \
+                            app.scan_btn.cget("border_color") == A.T.FOCUS, ("button focus ring", scale, mode)
+                        app.show("Empty Folders")
+                        box = app.empty.rows[0][0]
+                        box.focus_set()
+                        settle(200)
+                        if app.focus_get() is not None:
+                            assert "underline" in box.cget("font"), ("checkbox focus ring", scale, mode)
+                            ring_checked = True
+                        app.focus_set()
+                rings_unchecked += not ring_checked
             if mode == "Light":  # the toast never lands on an action button, whatever the page, size or scale
                 for page in ("Sort", "Duplicates", "Large & Old", "Empty Folders"):
                     app.show(page)
@@ -355,7 +360,9 @@ for scale in (1.0, 1.25, 1.5):
                         bx0, by0, bx1, by1 = box_of(w)
                         assert tx1 <= bx0 or bx1 <= tx0 or ty1 <= by0 or by1 <= ty0, \
                             f"toast covers the {page} {what} at {scale} {size}: {(tx0, ty0, tx1, ty1)} vs {(bx0, by0, bx1, by1)}"
-                    assert tx0 >= app.winfo_rootx() and tx1 <= app.winfo_rootx() + app.winfo_width() + 1, (page, size)
+                    if app.winfo_rootx() > -32000:  # -32000 = Windows has minimised the window; no screen position
+                        assert tx0 >= app.winfo_rootx() and tx1 <= app.winfo_rootx() + app.winfo_width() + 1, \
+                            (page, size, scale, (tx0, tx1), (app.winfo_rootx(), app.winfo_width()))
                     t.destroy()
             for page in ("Home", "Duplicates", "Large & Old", "Empty Folders", "Sort", "Settings"):
                 app.show(page)

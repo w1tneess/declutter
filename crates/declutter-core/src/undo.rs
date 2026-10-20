@@ -2,8 +2,6 @@
 //! The log is `<data_dir>/undo.json`, a JSON list of `{"time", "moves": [{"src", "dst"}]}` batches, newest last,
 //! capped at 20, written atomically. The schema and location must stay compatible with v0.2.2.
 
-use std::path::Path;
-
 use crate::ctx::Ctx;
 use crate::model::{ActionResult, Move, UndoInfo};
 

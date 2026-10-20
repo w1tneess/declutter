@@ -1,6 +1,6 @@
 //! Sort by type. Owner: core-A. See CONTRACT "Sort". Port of plan_sort / apply_moves and the CATEGORIES tables.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::ctx::Ctx;
 use crate::model::{ActionResult, Move, SortPlan};

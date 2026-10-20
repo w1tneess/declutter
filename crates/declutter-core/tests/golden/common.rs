@@ -154,7 +154,7 @@ pub fn content_of(f: &Value) -> Vec<u8> {
         let mut out = Vec::new();
         for s in segs {
             let c = s[0].as_str().unwrap().as_bytes()[0];
-            out.extend(std::iter::repeat(c).take(s[1].as_u64().unwrap() as usize));
+            out.extend(std::iter::repeat_n(c, s[1].as_u64().unwrap() as usize));
         }
         return out;
     }

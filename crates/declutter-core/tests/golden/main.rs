@@ -3,6 +3,9 @@
 //! nobody has implemented yet is reported as pending, not failed. Set `GOLDEN_STRICT=1` to fail on pending too.
 //! Set `GOLDEN_ONLY=<substring>` to run just the fixtures whose name contains it.
 
+// The helpers and op stubs go unused until core-A and core-B land their operations.
+#![allow(dead_code, unused_variables)]
+
 mod common;
 mod ops_a;
 mod ops_b;

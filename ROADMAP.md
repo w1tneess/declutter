@@ -38,14 +38,17 @@ Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .
   - tests: a project folder, a portable-app folder, and a plain folder with only an .exe.
 
 ## R5. UI backlog - shipped in v0.2.1
-- Rebuilding a 300-row list blocks the window (measured: about 0.4 s in the real event loop on main, Sort tab, after a sort, a rescan or a grace-period change). CustomTkinter makes and destroys about three widgets per row. Tried chunked destroying: worse (about 1 s). Options: fewer widgets per row, a lower row cap, or a canvas-drawn list.
+- Rebuilding a 300-row list blocked the window (about 0.7 s in `set_moves` on the Sort tab, after a sort, a rescan or a grace-period change; the cost is destroying the old widgets).
+  - Fixed: the rows live in their own frame. A rebuild hides the old frame at once and destroys its widgets about 12 ms at a time; the new rows are built after that. Lists of 60 widgets or fewer are destroyed at once as before. Worst single event on a rebuild was about 215 ms in a hand measurement; `tests/gui_check.py` asserts under 250 ms.
+  - Rules this depends on: destroy whole CTk widgets only (destroying a button's inner canvas on its own raises "invalid command name"); pause the clean-up while a background job runs (a worker's garbage collection must not free Tk variables, see `_run`).
+  - Cost: after a rescan of a big list the new rows appear about a second later than before.
 - Toast must not overlap the primary action button (anchor it left/centre of the status bar).
   - Done: it sits at the bottom left above the footer row; gui_check proves it clears the action button, the selection label and the status text on every page at 100/125/150% and at both window sizes.
 - One themed alert() dialog replacing the remaining native messageboxes.
   - Done: the only native box left is the fallback if the themed dialog itself fails (a unit test pins this).
 - Every new transition respects the Windows animation setting; focus rings at 100/125/150%.
   - Done: the setting is read each time (it was read once at start); focus rings are checked at all three scales in both themes.
-- Not done (see R3 note on the 300-row rebuild): the list rebuild freeze.
+- The list rebuild freeze: fixed after v0.2.1 (see the first item above); ships in the next release.
 
 ## Later, only if real users ask
 - Year-Month sub-folders (opt-in). Risk: moves the mess one level deeper and adds undo cases.

@@ -172,6 +172,8 @@ print(f"scan {scan_s:.1f}s, longest UI update {worst * 1000:.0f} ms, dup groups 
 assert worst < 0.5, f"UI blocked for {worst:.2f}s"
 assert len(app.dups.groups) == 100  # capped at MAX_ROWS
 assert len(app.large.rows) == 2
+settle(1500)  # the hidden old rows are destroyed in the background; a failure there is logged, not raised
+assert not [ln for ln in A.diag.recent_lines(500) if " ERROR " in ln], A.diag.recent_lines(500)[-5:]
 
 # ---- layout: Home cards sit below the Scan button; an empty tab header takes no space
 app.show("Home")
@@ -291,7 +293,7 @@ last.focus_set()
 settle(300)
 if FOCUS_OK:
     assert "underline" in last.cget("font"), last.cget("font")
-    assert app.empty.list._parent_canvas.yview()[0] > 0, "focused row must scroll into view"
+    assert app.empty._scroll._parent_canvas.yview()[0] > 0, "focused row must scroll into view"
     before = app.empty.items[-1][0].get()
     last._text_label.event_generate("<space>")
     assert app.empty.items[-1][0].get() != before, "Space toggles a focused checkbox"
@@ -410,6 +412,7 @@ app.set_folder(small)
 app.scan()
 pump(lambda: not app._busy and app.entries is not None)
 names = lambda tab: sorted(o.name for _, o in tab.items if o is not None)  # noqa: E731
+pump(lambda: not app.large._burying and len(names(app.large)) == 3)  # rows appear once the old ones are cleared
 assert names(app.large) == ["dead.crdownload", "pack.zip", "setup.exe"], names(app.large)
 assert not any(v.get() for v, _ in app.large.items), "leftovers must start unticked"
 assert app.large.rows[0][0].cget("text").startswith("Likely leftovers (3)"), app.large.rows[0][0].cget("text")
@@ -499,6 +502,16 @@ for mode in ("Light", "Dark"):
     settle(300)
     shoot(f"sort_rows_{mode}")
 build_worst = worst
+# a rebuild with 300 rows already on screen (rescan, grace period change) must not freeze the window either
+worst = 0.0
+t0 = time.perf_counter()
+app.sort.set_moves(list(app.moves[:300]))
+rebuild_call_ms = (time.perf_counter() - t0) * 1000
+pump(lambda: len(app.sort.files) == 300 and not app.sort._burying)
+rebuild_ms = max(rebuild_call_ms, worst * 1000)
+assert rebuild_ms < 250, f"rebuilding 300 rows froze the window for {rebuild_ms:.0f} ms"
+assert buttons_in(app.sort.list, "Never touch") == 300, "old rows must be gone once the clean-up finishes"
+assert not [ln for ln in A.diag.recent_lines(500) if " ERROR " in ln], A.diag.recent_lines(500)[-5:]
 walks.clear()
 mv = app.sort.files[0][1]
 worst = 0.0

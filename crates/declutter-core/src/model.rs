@@ -183,3 +183,31 @@ dto! {
 dto! {
     pub struct BinInfo { pub bytes: u64, pub items: u64 }
 }
+
+dto! {
+    /// The copies of one duplicate group the user chose to remove (the group is sent back so the shell can verify
+    /// a kept copy still exists right now).
+    pub struct DupRemoval { pub group: DupGroup, pub remove: Vec<String> }
+}
+
+dto! {
+    pub struct SimilarRemoval { pub group: SimilarGroup, pub remove: Vec<String> }
+}
+
+dto! {
+    pub struct AppInfo { pub version: String, pub data_dir: String }
+}
+
+/// What `export_csv` writes. The UI sends the rows it is showing; nothing is re-scanned.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum ExportPayload {
+    Sort { moves: Vec<Move> },
+    Duplicates { groups: Vec<DupGroup> },
+    LargeOld { files: Vec<FileRef> },
+    Leftovers { items: Vec<Leftover> },
+    Redownloads { pairs: Vec<Redownload> },
+    Similar { groups: Vec<SimilarGroup> },
+    EmptyDirs { dirs: Vec<String> },
+}

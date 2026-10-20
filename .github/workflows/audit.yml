@@ -1,0 +1,49 @@
+name: Audit
+
+# Known-vulnerable or disallowed dependencies. Each job is a no-op until its lockfile exists.
+# The weekly run exists because advisories appear without any code change; schedules run on the default branch only.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  push:
+    branches: ['v1**']
+  pull_request:
+    paths:
+      - 'Cargo.*'
+      - 'deny.toml'
+      - 'ui/package*.json'
+      - '.github/workflows/audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cargo-deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Advisories, licenses, banned crates and sources, all from deny.toml.
+      - if: hashFiles('Cargo.lock') != ''
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Reads the lockfile only; nothing is installed or run.
+      - if: hashFiles('ui/package-lock.json') != ''
+        working-directory: ui
+        run: npm audit --omit=dev --audit-level=high

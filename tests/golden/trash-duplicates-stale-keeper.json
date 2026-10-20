@@ -1,0 +1,85 @@
+{
+ "schema": 1,
+ "name": "trash-duplicates-stale-keeper",
+ "description": "If the keeper disappeared or changed size since the scan, nothing is removed.",
+ "op": "trash_duplicates",
+ "params": {
+  "remove": [
+   [
+    0,
+    [
+     1
+    ]
+   ],
+   [
+    1,
+    [
+     1
+    ]
+   ]
+  ],
+  "after_scan": [
+   {
+    "do": "delete",
+    "path": "k1.bin"
+   },
+   {
+    "do": "truncate",
+    "path": "t1.bin",
+    "size": 3
+   }
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "k1.bin",
+    "text": "KEEPKEEPKEEP",
+    "age_s": 1036800
+   },
+   {
+    "path": "k2.bin",
+    "text": "KEEPKEEPKEEP",
+    "age_s": 950400
+   },
+   {
+    "path": "t1.bin",
+    "text": "TRUNCATED-FILE-X",
+    "age_s": 1036800
+   },
+   {
+    "path": "t2.bin",
+    "text": "TRUNCATED-FILE-X",
+    "age_s": 950400
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "groups": [
+   [
+    "t1.bin",
+    "t2.bin"
+   ],
+   [
+    "k1.bin",
+    "k2.bin"
+   ]
+  ],
+  "result": {
+   "count": 0,
+   "errors": [
+    "t1.bin: no intact copy would remain, skipped",
+    "k1.bin: no intact copy would remain, skipped"
+   ]
+  },
+  "tree": {
+   "files": [
+    "k2.bin",
+    "t1.bin",
+    "t2.bin"
+   ],
+   "dirs": []
+  }
+ }
+}

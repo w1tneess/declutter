@@ -1,0 +1,89 @@
+{
+ "schema": 1,
+ "name": "sort-image-subbuckets",
+ "description": "Screenshots and chat pictures go one level deeper, matched at the start of the name only and only for images.",
+ "op": "plan_sort",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "Screenshot 2024-01-01.png"
+   },
+   {
+    "path": "SNIP.png"
+   },
+   {
+    "path": "Capture1.jpg"
+   },
+   {
+    "path": "my screenshot.png"
+   },
+   {
+    "path": "IMG-20240101-WA0001.jpg"
+   },
+   {
+    "path": "WhatsApp Image 2024-01-01.jpeg"
+   },
+   {
+    "path": "Screenshot notes.pdf"
+   },
+   {
+    "path": "photo.png"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "moves": [
+   {
+    "src": "Capture1.jpg",
+    "dst": "Images/Screenshots/Capture1.jpg",
+    "size": 10,
+    "category": "Images/Screenshots"
+   },
+   {
+    "src": "IMG-20240101-WA0001.jpg",
+    "dst": "Images/Chat/IMG-20240101-WA0001.jpg",
+    "size": 10,
+    "category": "Images/Chat"
+   },
+   {
+    "src": "SNIP.png",
+    "dst": "Images/Screenshots/SNIP.png",
+    "size": 10,
+    "category": "Images/Screenshots"
+   },
+   {
+    "src": "Screenshot 2024-01-01.png",
+    "dst": "Images/Screenshots/Screenshot 2024-01-01.png",
+    "size": 10,
+    "category": "Images/Screenshots"
+   },
+   {
+    "src": "Screenshot notes.pdf",
+    "dst": "Documents/Screenshot notes.pdf",
+    "size": 10,
+    "category": "Documents"
+   },
+   {
+    "src": "WhatsApp Image 2024-01-01.jpeg",
+    "dst": "Images/Chat/WhatsApp Image 2024-01-01.jpeg",
+    "size": 10,
+    "category": "Images/Chat"
+   },
+   {
+    "src": "my screenshot.png",
+    "dst": "Images/my screenshot.png",
+    "size": 10,
+    "category": "Images"
+   },
+   {
+    "src": "photo.png",
+    "dst": "Images/photo.png",
+    "size": 10,
+    "category": "Images"
+   }
+  ],
+  "recent_left": 0
+ }
+}

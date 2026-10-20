@@ -1,0 +1,88 @@
+{
+ "schema": 1,
+ "name": "leftover-installers-and-downloads",
+ "description": "Installers over 7 days old inside the Downloads folder, and dead .crdownload/.part over 3 days.",
+ "op": "leftovers",
+ "params": {
+  "downloads": "Downloads"
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "Downloads/setup.exe",
+    "age_s": 864000,
+    "size": 105
+   },
+   {
+    "path": "Downloads/tool.msi",
+    "age_s": 259200,
+    "size": 106
+   },
+   {
+    "path": "Downloads/disc.iso",
+    "age_s": 691200,
+    "size": 107
+   },
+   {
+    "path": "Downloads/app.msix",
+    "age_s": 1728000,
+    "size": 108
+   },
+   {
+    "path": "Downloads/dead.part",
+    "age_s": 345600,
+    "size": 109
+   },
+   {
+    "path": "Downloads/young.crdownload",
+    "age_s": 172800,
+    "size": 110
+   },
+   {
+    "path": "Downloads/old.crdownload",
+    "age_s": 432000,
+    "size": 111
+   },
+   {
+    "path": "Other/setup.exe",
+    "age_s": 864000,
+    "size": 112
+   },
+   {
+    "path": "Downloads/sub/deep.exe",
+    "age_s": 864000,
+    "size": 113
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "items": [
+   {
+    "path": "Downloads/sub/deep.exe",
+    "size": 113,
+    "reason": "Old installer"
+   },
+   {
+    "path": "Downloads/old.crdownload",
+    "size": 111,
+    "reason": "Unfinished download"
+   },
+   {
+    "path": "Downloads/dead.part",
+    "size": 109,
+    "reason": "Unfinished download"
+   },
+   {
+    "path": "Downloads/disc.iso",
+    "size": 107,
+    "reason": "Old installer"
+   },
+   {
+    "path": "Downloads/setup.exe",
+    "size": 105,
+    "reason": "Old installer"
+   }
+  ]
+ }
+}

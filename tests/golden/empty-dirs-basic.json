@@ -1,0 +1,73 @@
+{
+ "schema": 1,
+ "name": "empty-dirs-basic",
+ "description": "Folders with no files at any depth; desktop.ini/Thumbs.db do not count; hidden, protected, pinned and project folders count as content.",
+ "op": "empty_dirs",
+ "params": {
+  "ignore": [
+   "holdpin/Keep"
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "junk/desktop.ini",
+    "text": "x"
+   },
+   {
+    "path": "junk/Thumbs.db",
+    "text": "x"
+   },
+   {
+    "path": "full/f.txt"
+   },
+   {
+    "path": "parent/full/g.txt"
+   },
+   {
+    "path": "hid/.secret",
+    "text": "s"
+   },
+   {
+    "path": "holdhidden/inner/.x",
+    "text": "s"
+   },
+   {
+    "path": "pinned/keep.txt"
+   },
+   {
+    "path": "holdprotected/Windows/w.txt"
+   },
+   {
+    "path": "withproj/proj/package.json",
+    "text": "{}"
+   }
+  ],
+  "dirs": [
+   "a/b/c",
+   "d",
+   "holdhidden2/hiddendir",
+   "holdpin/Keep",
+   "holdproj/proj/.git",
+   "holdprot/Windows",
+   "nested/empty1/empty2"
+  ],
+  "dir_attrs": {
+   "holdhidden2/hiddendir": [
+    "hidden"
+   ]
+  }
+ },
+ "expected": {
+  "dirs": [
+   "nested/empty1/empty2",
+   "nested/empty1",
+   "nested",
+   "a/b/c",
+   "junk",
+   "a/b",
+   "a",
+   "d"
+  ]
+ }
+}

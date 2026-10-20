@@ -1,0 +1,353 @@
+{
+ "schema": 1,
+ "name": "undo-batch-cap",
+ "description": "The log keeps only the newest 20 batches; undo reverses just the last one.",
+ "op": "undo",
+ "params": {
+  "rounds": 0,
+  "apply_rounds": 22
+ },
+ "tree": {
+  "files": [],
+  "dirs": []
+ },
+ "expected": {
+  "applies": [
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   },
+   {
+    "count": 1,
+    "errors": []
+   }
+  ],
+  "log_after_apply": [
+   {
+    "moves": [
+     {
+      "src": "f02.txt",
+      "dst": "Documents/f02.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f03.txt",
+      "dst": "Documents/f03.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f04.txt",
+      "dst": "Documents/f04.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f05.txt",
+      "dst": "Documents/f05.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f06.txt",
+      "dst": "Documents/f06.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f07.txt",
+      "dst": "Documents/f07.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f08.txt",
+      "dst": "Documents/f08.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f09.txt",
+      "dst": "Documents/f09.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f10.txt",
+      "dst": "Documents/f10.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f11.txt",
+      "dst": "Documents/f11.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f12.txt",
+      "dst": "Documents/f12.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f13.txt",
+      "dst": "Documents/f13.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f14.txt",
+      "dst": "Documents/f14.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f15.txt",
+      "dst": "Documents/f15.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f16.txt",
+      "dst": "Documents/f16.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f17.txt",
+      "dst": "Documents/f17.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f18.txt",
+      "dst": "Documents/f18.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f19.txt",
+      "dst": "Documents/f19.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f20.txt",
+      "dst": "Documents/f20.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   },
+   {
+    "moves": [
+     {
+      "src": "f21.txt",
+      "dst": "Documents/f21.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   }
+  ],
+  "tree_after_apply": {
+   "files": [
+    "Documents/f00.txt",
+    "Documents/f01.txt",
+    "Documents/f02.txt",
+    "Documents/f03.txt",
+    "Documents/f04.txt",
+    "Documents/f05.txt",
+    "Documents/f06.txt",
+    "Documents/f07.txt",
+    "Documents/f08.txt",
+    "Documents/f09.txt",
+    "Documents/f10.txt",
+    "Documents/f11.txt",
+    "Documents/f12.txt",
+    "Documents/f13.txt",
+    "Documents/f14.txt",
+    "Documents/f15.txt",
+    "Documents/f16.txt",
+    "Documents/f17.txt",
+    "Documents/f18.txt",
+    "Documents/f19.txt",
+    "Documents/f20.txt",
+    "Documents/f21.txt"
+   ],
+   "dirs": [
+    "Documents"
+   ]
+  },
+  "can_undo": true,
+  "undo_count": 1,
+  "undo": {
+   "count": 1,
+   "errors": []
+  },
+  "tree_after_undo": {
+   "files": [
+    "Documents/f00.txt",
+    "Documents/f01.txt",
+    "Documents/f02.txt",
+    "Documents/f03.txt",
+    "Documents/f04.txt",
+    "Documents/f05.txt",
+    "Documents/f06.txt",
+    "Documents/f07.txt",
+    "Documents/f08.txt",
+    "Documents/f09.txt",
+    "Documents/f10.txt",
+    "Documents/f11.txt",
+    "Documents/f12.txt",
+    "Documents/f13.txt",
+    "Documents/f14.txt",
+    "Documents/f15.txt",
+    "Documents/f16.txt",
+    "Documents/f17.txt",
+    "Documents/f18.txt",
+    "Documents/f19.txt",
+    "Documents/f20.txt",
+    "f21.txt"
+   ],
+   "dirs": [
+    "Documents"
+   ]
+  },
+  "log_len_after_undo": 19
+ }
+}

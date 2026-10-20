@@ -1,0 +1,142 @@
+{
+ "schema": 1,
+ "name": "check-root-refusals",
+ "description": "Refused roots and their user-visible reasons.",
+ "op": "check_root",
+ "params": {
+  "cases": [
+   "$DRIVE_ROOT",
+   "$HOME",
+   "$HOME_PARENT",
+   "file.txt",
+   "nonexistent",
+   "projgit",
+   "projpkg",
+   "projsln",
+   "projnm",
+   "Windows/sub",
+   "Program Files",
+   "data/AppData",
+   "ok",
+   "empty",
+   "."
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "file.txt"
+   },
+   {
+    "path": "projgit/x.txt"
+   },
+   {
+    "path": "projpkg/package.json",
+    "text": "{}"
+   },
+   {
+    "path": "projsln/a.sln",
+    "text": "x"
+   },
+   {
+    "path": "projnm/f.txt"
+   },
+   {
+    "path": "Windows/sub/f.txt"
+   },
+   {
+    "path": "Program Files/f.txt"
+   },
+   {
+    "path": "ok/f.txt"
+   },
+   {
+    "path": "data/AppData/f.txt"
+   }
+  ],
+  "dirs": [
+   "projgit/.git",
+   "projnm/node_modules",
+   "empty"
+  ]
+ },
+ "expected": {
+  "results": [
+   {
+    "case": "$DRIVE_ROOT",
+    "ok": false,
+    "reason": "Drive roots are not allowed. Pick a specific folder."
+   },
+   {
+    "case": "$HOME",
+    "ok": false,
+    "reason": "Pick a subfolder (e.g. Downloads), not your whole home folder."
+   },
+   {
+    "case": "$HOME_PARENT",
+    "ok": false,
+    "reason": "That folder contains your whole profile. Pick a subfolder."
+   },
+   {
+    "case": "file.txt",
+    "ok": false,
+    "reason": "Not a folder."
+   },
+   {
+    "case": "nonexistent",
+    "ok": false,
+    "reason": "Not a folder."
+   },
+   {
+    "case": "projgit",
+    "ok": false,
+    "reason": "This is a project folder (it has .git, package.json, pyproject.toml, a .sln file or similar)."
+   },
+   {
+    "case": "projpkg",
+    "ok": false,
+    "reason": "This is a project folder (it has .git, package.json, pyproject.toml, a .sln file or similar)."
+   },
+   {
+    "case": "projsln",
+    "ok": false,
+    "reason": "This is a project folder (it has .git, package.json, pyproject.toml, a .sln file or similar)."
+   },
+   {
+    "case": "projnm",
+    "ok": false,
+    "reason": "This is a project folder (it has .git, package.json, pyproject.toml, a .sln file or similar)."
+   },
+   {
+    "case": "Windows/sub",
+    "ok": false,
+    "reason": "System or protected folder."
+   },
+   {
+    "case": "Program Files",
+    "ok": false,
+    "reason": "System or protected folder."
+   },
+   {
+    "case": "data/AppData",
+    "ok": false,
+    "reason": "System or protected folder."
+   },
+   {
+    "case": "ok",
+    "ok": true,
+    "reason": ""
+   },
+   {
+    "case": "empty",
+    "ok": true,
+    "reason": ""
+   },
+   {
+    "case": ".",
+    "ok": true,
+    "reason": ""
+   }
+  ]
+ }
+}

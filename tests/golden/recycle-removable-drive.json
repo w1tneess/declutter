@@ -1,0 +1,40 @@
+{
+ "schema": 1,
+ "name": "recycle-removable-drive",
+ "description": "Anything not on a local fixed drive is refused with a plain message.",
+ "op": "recycle",
+ "params": {
+  "paths": [
+   "a.txt",
+   "b.txt"
+  ],
+  "drive_type": 2
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a.txt"
+   },
+   {
+    "path": "b.txt"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "result": {
+   "count": 0,
+   "errors": [
+    "a.txt: on a removable or network drive, which may have no Recycle Bin, skipped",
+    "b.txt: on a removable or network drive, which may have no Recycle Bin, skipped"
+   ]
+  },
+  "tree": {
+   "files": [
+    "a.txt",
+    "b.txt"
+   ],
+   "dirs": []
+  }
+ }
+}

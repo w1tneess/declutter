@@ -257,8 +257,9 @@ class Tab(ctk.CTkFrame):
             self.search.bind("<Escape>", lambda _e: (self.search.delete(0, "end"), self._filter_soon()))
         self.head = ctk.CTkFrame(self, fg_color="transparent", height=0)  # default 200 px leaves a gap when empty
         self.head.grid(row=1, sticky="ew", pady=T.CARD_GAP // 2)
-        self.list = ctk.CTkScrollableFrame(self, corner_radius=T.R_CARD, fg_color=T.SURFACE)
-        self.list.grid(row=2, sticky="nsew")
+        self._scroll = ctk.CTkScrollableFrame(self, corner_radius=T.R_CARD, fg_color=T.SURFACE)
+        self._scroll.grid(row=2, sticky="nsew")
+        self.list = None  # the rows' frame inside _scroll; _reset swaps in a fresh one
         foot = ctk.CTkFrame(self, fg_color="transparent")
         foot.grid(row=3, sticky="ew", pady=(T.CARD_GAP, 0))
         self.sel_label = ctk.CTkLabel(foot, text="Selected: 0 items", font=(FONT, 14), text_color=T.TEXT_MUTED)
@@ -279,12 +280,41 @@ class Tab(ctk.CTkFrame):
         ctk.CTkLabel(self.list, text=message, font=(FONT, 15), text_color=T.TEXT_MUTED).pack(pady=40)
         self.update_selection()
 
+    _burying: list = []  # hidden widgets still waiting to be destroyed, children before their parents
+
     def _reset(self) -> None:
+        """Swap in an empty frame for the rows and destroy the old one a few ms at a time, hidden: destroying
+        300 rows in one go froze the window for about 0.7 s."""
         self._gen += 1
-        for w in self.list.winfo_children():
-            w.destroy()
+
+        def below(w) -> list:  # a CTk widget's own canvas and labels are destroyed with it, never on their own
+            kids = w.winfo_children() if isinstance(w, ctk.CTkFrame) else []
+            return [d for c in kids if not isinstance(c, ctk.CTkCanvas) for d in below(c)] + [w]
+
+        old = self.list
+        self.list = ctk.CTkFrame(self._scroll, fg_color="transparent")
+        self.list.pack(fill="x", expand=True)
+        if old is not None:
+            old.pack_forget()
+            units = below(old)
+            if len(units) <= 60 and not self._burying:  # about 40 ms: not worth the wait
+                old.destroy()
+            else:
+                start = not self._burying
+                self._burying = self._burying + units
+                if start:
+                    self.after(1, self._bury)
         self.items = []
         self.rows = []
+
+    def _bury(self) -> None:
+        if self.winfo_toplevel()._busy:  # destroyed rows must not turn into garbage while a worker runs (see _run)
+            return self.after(100, self._bury)
+        end = time.perf_counter() + 0.012
+        while self._burying and time.perf_counter() < end:
+            self._burying.pop(0).destroy()
+        if self._burying:
+            self.after(1, self._bury)
 
     def _add_row(self, widget, text: str, **pack) -> None:
         self.rows.append((widget, text.lower(), pack))
@@ -317,6 +347,8 @@ class Tab(ctk.CTkFrame):
         def step(i: int) -> None:
             if gen != self._gen:
                 return
+            if self._burying:  # old rows first: building and destroying together left one long stall at the end
+                return self.after(5, step, i)
             for r in rows[i:i + chunk]:
                 make(r)
             self.update_selection()

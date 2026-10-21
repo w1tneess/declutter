@@ -4,9 +4,6 @@
 //! fixtures in `tests/golden/`, which are generated from the Python implementation. Read
 //! `docs/ARCHITECTURE.md` for module ownership and conventions before changing anything.
 
-// Stubs carry `todo!()` bodies until their owner lands them; the integration step removes this allow.
-#![allow(unused_variables, dead_code)]
-
 pub mod ctx;
 pub mod model;
 pub mod platform;

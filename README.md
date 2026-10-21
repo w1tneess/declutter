@@ -4,12 +4,19 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
-## Install
+## Install (v0.2.2, the current release)
 1. Download `Declutter-Setup.exe` from the [latest release](https://github.com/w1tneess/declutter/releases/latest). Prefer no installer? Take `Declutter-portable.zip`, unzip it anywhere and run `Declutter.exe`.
 2. Run the installer. It installs for your account only, so no admin rights are needed.
 3. The app is not code-signed yet, so Windows SmartScreen may say "Windows protected your PC" (Unknown publisher). Click **More info**, then **Run anyway**.
 
 Uninstall from Windows Settings > Apps. Website source is in `website/` (deployed with Vercel, see `vercel.json`).
+
+## Declutter 1.0 (in development)
+A rewrite is in progress on the branch `v1-rust`: a Rust core, a Tauri 2 shell and a React/TypeScript UI, with the same safety rules (`SPEC.md`). It is **not released**; the install steps above are still for v0.2.2, which stays the shipping app (and the test oracle for the rewrite) until 1.0 is out. A first beta is planned as v0.3.0.
+
+New on that branch: similar-picture groups, sort presets (built-in Downloads, Photos, Work, plus your own), CSV export, a "space freed" tally, and an optional weekly reminder (a Task Scheduler task that runs `declutter --remind`; it only scans and shows a notification, it never moves anything). Not yet ported from v0.2.2: the right-click "Tidy with Declutter" entry, opening on a folder given on the command line, and the diagnostics log. Design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`DESIGN.md`](DESIGN.md). Plan and status: [`ROADMAP.md`](ROADMAP.md).
+
+The 1.0 installer has never been built end to end and 1.0 is not code-signed yet. With Windows **Smart App Control** on, Windows refuses to start unsigned apps and offers no per-app override; see [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
 
 ## What it does
 - **Sort by type**: moves loose files (top level only) into Images, Documents, Videos, Audio, Archives, Installers, Code, Other. Screenshots (`Screenshot*`, `Snip*`, `Capture*`) go to Images/Screenshots and WhatsApp pictures (`IMG-########-WA####`, `WhatsApp Image*`) to Images/Chat. Shortcuts and config files (`.lnk`, `.url`, `.ini`) are never moved. Files you touched in the last 24 hours (setting, 0 to 72, on the Sort screen) are left alone, judged by the later of modified and created time, so a fresh copy of an old file counts as new. Every file is listed and ticked; untick it, or press **Never touch** on its row to pin it. Undo supported.
@@ -35,6 +42,7 @@ python -m declutter
 ```
 
 ## Develop
+v0.2.2 (Python):
 ```
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
@@ -45,6 +53,19 @@ Before a release, also run the GUI checks (opens real windows, uses temp folders
 python tests/gui_check.py
 ```
 With Pillow installed (`pip install pillow`) it saves screenshots to `.pytest_tmp/shots` for a visual check.
+
+### Build and test 1.0
+CI is the compiler. On a PC with Smart App Control in enforcement mode, locally built unsigned Rust binaries (build scripts, test executables, the app) fail to start with error 4551, so `cargo` cannot be run there. Push a `v1*` branch instead: the **Rust** workflow runs `cargo test --workspace --exclude declutter-shell --locked` (the golden fixtures in `tests/golden/`, generated from the Python app by `tools/gen_golden.py`), clippy with `-D warnings` and a check that the generated TypeScript bindings are current; the **UI** workflow runs lint, typecheck, vitest, the build and Playwright with axe accessibility checks.
+
+The UI toolchain is not affected and runs locally (Node):
+```
+cd ui
+npm ci
+npm test          # vitest
+npm run e2e       # build, then Playwright
+npm run dev       # browser preview with the mock API
+```
+Release builds come from `.github/workflows/release-v1.yml`, which today fires only on `v1.*` tags (a `v0.3.0` beta tag would start the Python `release.yml` instead; see `ROADMAP.md`); see [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md) and the perf targets in [`docs/PERF.md`](docs/PERF.md).
 
 ## Known limitations
 - The `.exe` is unsigned, so Windows SmartScreen shows "Unknown publisher" (More info, then Run anyway).

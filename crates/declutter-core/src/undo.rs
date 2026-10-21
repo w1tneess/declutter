@@ -44,7 +44,10 @@ fn read_log(ctx: &Ctx) -> Vec<Value> {
 
 /// Atomic, so a crash never leaves a half-written log.
 fn write_log(ctx: &Ctx, batches: &[Value]) -> std::io::Result<()> {
-    write_atomic(&log_path(ctx), serde_json::to_string_pretty(batches)?.as_bytes())
+    write_atomic(
+        &log_path(ctx),
+        serde_json::to_string_pretty(batches)?.as_bytes(),
+    )
 }
 
 /// Append one batch of completed moves (called by `sort::apply_moves`).

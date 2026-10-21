@@ -577,10 +577,10 @@ impl App {
         reminder::status(&self.ctx())
     }
 
-    pub fn reminder_enable(&self, schedule: &str) -> Result<ReminderStatus, String> {
+    pub fn reminder_enable(&self) -> Result<ReminderStatus, String> {
         let exe = std::env::current_exe()
             .map_err(|_| "Could not find Declutter's program file.".to_string())?;
-        reminder::enable(&self.ctx(), &exe, schedule)
+        reminder::enable(&self.ctx(), &exe)
     }
 
     pub fn reminder_disable(&self) -> Result<ReminderStatus, String> {

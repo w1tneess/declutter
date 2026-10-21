@@ -33,7 +33,7 @@ preview; the real one is selected when `window.__TAURI_INTERNALS__` exists.
 | `open_recycle_bin` | | | opens Explorer's Recycle Bin |
 | `reveal_in_explorer` | `path` | | `explorer /select,` only; never executes the file |
 | `reminder_status` | | `ReminderStatus` | |
-| `reminder_enable` / `reminder_disable` | `schedule` / | `ReminderStatus` | scan-only task, off by default |
+| `reminder_enable` / `reminder_disable` | | `ReminderStatus` | scan-only weekly task, off by default |
 
 Every action command that sends something to the Recycle Bin calls `settings::record_freed` for what actually went.
 

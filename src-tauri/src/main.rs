@@ -215,8 +215,8 @@ async fn reminder_status(app: AppState<'_>) -> Res<ReminderStatus> {
 }
 
 #[tauri::command]
-async fn reminder_enable(app: AppState<'_>, schedule: String) -> Res<ReminderStatus> {
-    blocking(app, move |a| a.reminder_enable(&schedule)).await
+async fn reminder_enable(app: AppState<'_>) -> Res<ReminderStatus> {
+    blocking(app, |a| a.reminder_enable()).await
 }
 
 #[tauri::command]

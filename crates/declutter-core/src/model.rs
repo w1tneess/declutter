@@ -177,7 +177,7 @@ dto! {
 }
 
 dto! {
-    pub struct ReminderStatus { pub enabled: bool, pub schedule: String, pub next_run: Option<String> }
+    pub struct ReminderStatus { pub enabled: bool, pub next_run: Option<String> }
 }
 
 dto! {

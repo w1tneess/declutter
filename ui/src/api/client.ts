@@ -51,7 +51,7 @@ export interface Api {
   openRecycleBin(): Promise<void>;
   revealInExplorer(path: string): Promise<void>;
   reminderStatus(): Promise<ReminderStatus>;
-  reminderEnable(schedule: string): Promise<ReminderStatus>;
+  reminderEnable(): Promise<ReminderStatus>;
   reminderDisable(): Promise<ReminderStatus>;
   /** A folder dropped on the window (Tauri drag and drop). Returns an unsubscribe function. */
   onFolderDrop(cb: (path: string) => void): () => void;

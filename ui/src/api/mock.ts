@@ -147,7 +147,7 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
   let undo: (UndoInfo & { srcs: string[]; at: number }) | null = null;
   let freed: SpaceFreed = { bytes: 7.4 * 1024 * MB, files: 312, since: '2026-03-02' };
   let bin = { bytes: 2.3 * 1024 * MB, items: 148 };
-  let reminder: ReminderStatus = { enabled: false, schedule: 'weekly', nextRun: null };
+  let reminder: ReminderStatus = { enabled: false, nextRun: null };
   let settings: Settings = {
     theme: 'system', recentHours: 24, minMb: 100, olderDays: 0, lastFolder: null, rememberLastFolder: false,
     pins: [], activePreset: null, reminderEnabled: false,
@@ -319,7 +319,7 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
     openRecycleBin: async () => undefined,
     revealInExplorer: async () => undefined,
     reminderStatus: async () => reminder,
-    reminderEnable: async (schedule) => (reminder = { enabled: true, schedule, nextRun: 'Monday 10:00' }),
+    reminderEnable: async () => (reminder = { enabled: true, nextRun: 'Monday 10:00' }),
     reminderDisable: async () => (reminder = { ...reminder, enabled: false, nextRun: null }),
     onFolderDrop: () => () => undefined,
   };

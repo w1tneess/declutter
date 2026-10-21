@@ -24,7 +24,7 @@ Behaviour is fixed by `docs/CONTRACT.md` and proven by golden fixtures generated
 
 Decisions needed before the beta:
 - `release-v1.yml` fires only on `v1.*` tags and the Python `release.yml` fires on `v0.*`. A `v0.3.0` tag would build the Python app, not the beta. Either widen the 1.0 workflow's tag filter (and keep the two disjoint) or name the beta `v1.0.0-beta.1`.
-- Signing: apply to SignPath Foundation or set up Azure Artifact Signing (`docs/DISTRIBUTION.md`); without a signature, a machine with Smart App Control refuses to start the app.
+- Signing: **decided, SignPath Foundation** (`docs/DISTRIBUTION.md`, policy in `docs/CODE_SIGNING_POLICY.md`; `release-v1.yml` signs through SignPath's connector when `SIGNING_PROVIDER` is `signpath`). Still blocking a signed release: SignPath requires a project already released in the form to be signed, so the first beta ships unsigned with the README notice; then apply (unknown whether a single-maintainer project is accepted); then the one-time setup (the `release-signing` environment with its secret and variables, the SignPath project, artifact configuration and signing policy). Unconfirmed until tested on a machine with Smart App Control in enforcement mode: whether Smart App Control accepts SignPath Foundation's certificate (Microsoft names Azure Artifact Signing as the preferred route, which stays the fallback). Without a signature, a machine with Smart App Control refuses to start the app.
 - Website and README install text change at release (the PR that added this section lists the website claims).
 
 ### Known follow-ups (1.0)

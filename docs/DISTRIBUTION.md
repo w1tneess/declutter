@@ -35,68 +35,124 @@ release, or the release must go out with the README notice at the bottom.
 | Smart App Control | Not confirmed (see below) | Microsoft names it "the preferred way" to sign for Smart App Control | Accepted if issued by a trusted provider |
 | EV | n/a | Issues no EV certificates and says it never will | EV no longer gives instant SmartScreen reputation (Microsoft), so it is not worth the premium for that purpose |
 
-Recommendation: apply to **SignPath Foundation** first (free, and fits an MIT project), and set up **Azure Artifact
-Signing** if the maintainer's location qualifies and a paid path is acceptable or SignPath says no. Do not buy an EV
-certificate for SmartScreen reasons. The Microsoft Store (Store-distributed apps are re-signed by Microsoft and never
-shown SmartScreen warnings) is the only route with no reputation period at all, but it means an MSIX package and a
-Partner Center account and is not planned for 1.0.
+**Decision (2026-10-21): SignPath Foundation.** The maintainer chose it: free for an MIT project, and it fits the
+public GitHub Actions build this repository already has. Azure Artifact Signing stays as the fallback (end of the next
+section). Do not buy an EV certificate for SmartScreen reasons. The Microsoft Store (Store-distributed apps are
+re-signed by Microsoft and never shown SmartScreen warnings) is the only route with no reputation period at all, but it
+means an MSIX package and a Partner Center account and is not planned for 1.0.
 
-## How the release workflow wires signing in
+## Signing with SignPath Foundation
+
+### The order problem: the first beta ships unsigned
+
+SignPath Foundation's terms say "the project must already be released in the form that should be signed". There is no
+Declutter 1.0 release yet, so the order has to be:
+
+1. **Ship the first beta unsigned**, built by `release-v1.yml` from a tag while `SIGNING_PROVIDER` is unset (the signing
+   jobs are skipped; the unsigned installer, portable zip and checksums are published). Put the README notice from
+   "What the README should say in the meantime" next to the download. Smart App Control will refuse this build.
+2. **Apply** to SignPath Foundation with that release as the evidence (checklist below).
+3. **Configure** SignPath and GitHub once accepted (one-time setup below), set `SIGNING_PROVIDER` to `signpath`, and tag
+   the next release: the first signed build.
+
+### How the release workflow wires signing in
 
 `.github/workflows/release-v1.yml` runs `build -> sign-app -> bundle -> sign-installer -> checksums -> publish`.
 The app exe is signed **before** it is packed into the installer and the portable zip, then the installer is signed, so
 the installed program and the installer both carry a signature (the zip's exe is the signed one; the zip itself is not
-signed). The two signing jobs:
+signed).
 
-- run only SHA-pinned actions (download-artifact, azure/login, artifact-signing-action, upload-artifact): no `npm`, no
-  `cargo`, so no dependency or build script ever runs where a signing identity is reachable;
-- run only on a real `v1.*` tag push and only when the repository **variable** `SIGNING_PROVIDER` is `azure`; the
-  workflow_dispatch dry run and a repository without the variable skip them (unsigned artifacts, which Smart App Control
-  will refuse);
-- use the GitHub environment `release-signing`, hold `id-token: write` and nothing else, and verify with
-  `Get-AuthenticodeSignature` that the result is `Valid`;
-- authenticate with OIDC. No client secret exists anywhere.
+- `build` uploads the unsigned app exe as the workflow artifact `app-exe` and exposes that upload's id as the job
+  output `app-exe-id`. `bundle` uploads `installer` (setup exe and portable zip, as before) and also the setup exe on
+  its own as `installer-setup`, exposing that upload's id as `installer-setup-id`.
+- `sign-app` and `sign-installer` call SignPath's connector `SignPath/github-action-submit-signing-request`, pinned to
+  commit `f6d04783b4569d051e0c80105fe66e82819d0092` (the `v3` and `v3.0` tags; `v3` is a lightweight tag pointing
+  straight at that commit, checked with the GitHub API on 2026-10-21). Inputs used, all read from the action's
+  `action.yml` at that commit: `api-token`, `organization-id`, `project-slug`, `signing-policy-slug`,
+  `github-artifact-id`, `wait-for-completion: true`, `wait-for-completion-timeout-in-seconds: 3600` (the default is
+  600; the wait includes the manual approval in SignPath) and `output-artifact-directory`. `artifact-configuration-slug`
+  is not set, so the project's default artifact configuration is used; `github-token` keeps its default, the job's
+  `GITHUB_TOKEN`.
+- The connector hands the artifact id to SignPath, which fetches the artifact, checks that it came from this
+  repository's workflow on GitHub-hosted runners (its "trusted build system" check) and signs it; the signed result is
+  extracted into `signed/`. `sign-app` re-uploads it as `app-exe` (overwrite), which `bundle` packs. `sign-installer`
+  copies the signed setup exe over the unsigned one in the `installer` artifact and re-uploads that (overwrite), which
+  `checksums` hashes and `publish` releases.
+- Both jobs then check every exe with `Get-AuthenticodeSignature`: the status must be `Valid` and the signer
+  certificate's subject must contain `CN=SignPath Foundation` (SignPath's terms: the certificate is issued to the
+  Foundation, which is shown as the publisher).
+- The signing jobs run only SHA-pinned actions and PowerShell checks: no checkout, no `npm`, no `cargo`, so no
+  dependency or build script ever runs where the API token is reachable. Their permissions are `actions: read` (the
+  connector reads the run and its artifact) and `contents: read`, nothing else.
+- They run only on a real `v1.*` tag push and only when the repository **variable** `SIGNING_PROVIDER` is `signpath`.
+  The workflow_dispatch dry run and a repository without the variable skip them and produce unsigned files. No dry run
+  gets a write token; only `publish`, on a tag, does.
+- They use the GitHub environment `release-signing`, the only place the API token exists.
 
-### One-time setup for Azure Artifact Signing
+### One-time setup (after acceptance)
 
-1. In Azure: register `Microsoft.CodeSigning`, create a Signing account, complete identity validation, create a
-   **Public Trust** certificate profile.
-2. Create an app registration with a **federated credential** for GitHub Actions with subject
-   `repo:w1tneess/declutter:environment:release-signing`, and give it the role **Artifact Signing Certificate Profile
-   Signer** on the signing account.
-3. In GitHub: Settings, Environments, create `release-signing`; add required reviewers (the maintainer); under
-   deployment branches and tags allow only the tag pattern `v1.*`. Add these environment **variables** (they are ids, not
-   secrets): `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_SIGNING_ENDPOINT` (the regional
-   `https://<region>.codesigning.azure.net` URL), `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE`.
-4. Set the repository variable `SIGNING_PROVIDER` to `azure`. Unsetting it switches signing off again.
+GitHub (settings of `w1tneess/declutter`):
 
-A tag build then pauses at each signing job until the maintainer approves it in the Actions UI.
+1. Environments: create `release-signing`. Required reviewers: the maintainer. Deployment branches and tags: selected
+   only, with the tag rule `v1.*`.
+2. In that environment add the **secret** `SIGNPATH_API_TOKEN` (an API token of a SignPath user with submitter
+   permission on the signing policy) and the **variables** `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG` and
+   `SIGNPATH_SIGNING_POLICY_SLUG`. Do not make the token a repository secret: every job could then read it.
+3. Repository variable `SIGNING_PROVIDER` = `signpath`. Unsetting it switches signing off again.
 
-### If SignPath is chosen instead
+SignPath (the organization SignPath Foundation sets up for the project):
 
-SignPath's connector is also a pinned action (`SignPath/github-action-submit-signing-request`, v3 is commit
-`f6d04783b4569d051e0c80105fe66e82819d0092`). Replace the three Azure steps in `sign-app` and `sign-installer` with it,
-keeping the environment and the job split. What differs, from SignPath's documentation:
+1. Note the **organization id**, and create or confirm the **project** (its slug goes into `SIGNPATH_PROJECT_SLUG`).
+2. **Trusted build system:** link the project to GitHub.com for the repository `w1tneess/declutter` (SignPath's GitHub
+   trusted build system).
+3. **Artifact configuration** (the project default) matching what the workflow uploads. `actions/upload-artifact`
+   zips each artifact, so the root is a zip; each artifact holds exactly one exe at its root (`declutter.exe` in
+   `app-exe`, `Declutter_<version>_x64-setup.exe` in `installer-setup`), so one configuration serves both requests:
 
-- The unsigned file must have been uploaded with `actions/upload-artifact` v4 or later in the same workflow run, and the
-  step receives that upload's `artifact-id` as `github-artifact-id` (so `build` and `bundle` must expose the id as a job
-  output). SignPath verifies that the artifact came from this repository's workflow on GitHub-hosted runners (its
-  "trusted build system" check), which is the origin verification that makes a stolen token useless from elsewhere.
-- The action needs an API token (`api-token` is a required input). It lives only in the `release-signing` environment,
-  never in a build job.
-- Needs `actions: read` and `contents: read` on the signing job, plus the organization id, project slug and signing
-  policy slug as environment variables.
-- Every release is approved in SignPath as well, and the artifact configuration must match what is uploaded (a zip by
-  default).
+   ```xml
+   <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+     <zip-file>
+       <pe-file path="*.exe">
+         <authenticode-sign/>
+       </pe-file>
+     </zip-file>
+   </artifact-configuration>
+   ```
 
-### Applying to SignPath Foundation
+   A wildcard must match exactly one file unless `max-matches` says otherwise, which is what is wanted here.
+4. **Signing policy** for releases (its slug goes into `SIGNPATH_SIGNING_POLICY_SLUG`) with manual approval, the
+   maintainer as **approver**, and the API token's user as **submitter**.
+5. MFA on the maintainer's SignPath and GitHub accounts.
 
-SignPath's public pages list conditions but no step-by-step procedure (the application page returned no content to
-me). What is known: apply on signpath.org, meet the eligibility conditions in the table, publish a **code signing
-policy** on the project's home page (author, reviewer and approver roles; build system; what is signed), turn on MFA for
-everyone with access, and keep product name and version metadata consistent. Prepare before applying: a released 1.0
-in the form to be signed, a download page that describes the app, a README/website section for the policy, and a public
-CI build (this repository's workflow is that build).
+A tag build then pauses at each signing job twice: GitHub asks for the environment approval, then SignPath waits for
+the signing request to be approved (up to an hour before the job gives up).
+
+### Applying to SignPath Foundation: checklist
+
+From SignPath Foundation's terms (signpath.org/terms; the apply page on signpath.org lists no procedure of its own):
+
+- [ ] OSI-approved licence, without commercial dual licensing, for the project and every component: MIT for Declutter;
+      the dependency licences are gated by `deny.toml`.
+- [ ] Already released in the form to be signed: the unsigned first beta above.
+- [ ] A download page that describes what the app does: the README and the GitHub release.
+- [ ] A code signing policy on the project home page, linked with the words "Code signing policy", saying "Free code
+      signing provided by SignPath.io, certificate by SignPath Foundation":
+      [`CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md), linked from the README.
+- [ ] Team roles and members (authors, reviewers, approvers): in the policy, all held by the single maintainer.
+- [ ] A privacy statement: in the policy (the app sends nothing; the installer may download Microsoft's WebView2
+      bootstrapper).
+- [ ] MFA for everyone with access, on GitHub and on SignPath.
+- [ ] Built from its own source by a public CI build: `release-v1.yml` on GitHub-hosted runners.
+- [ ] Consistent product name and version metadata in the signed files (see the version mismatch in `ROADMAP.md`).
+
+### Fallback: Azure Artifact Signing
+
+If SignPath Foundation declines the project, or its certificate turns out not to satisfy Smart App Control, Azure
+Artifact Signing is the alternative (Basic $9.99 per month on a paid Azure subscription, identity validation,
+individuals only in the US or Canada; Microsoft names it the preferred way to sign for Smart App Control). It would
+replace the connector step in both signing jobs with `azure/login` (OIDC with a federated credential that trusts only
+the `release-signing` environment, so `id-token: write` instead of `actions: read`) followed by
+`Azure/artifact-signing-action` on the downloaded files; the job split and the rest of the pipeline stay as they are.
 
 ## SmartScreen reputation: what to expect
 
@@ -127,19 +183,27 @@ releases are unsigned too and fall under the same Smart App Control rule; the sa
 
 ## What is not confirmed
 
-- **SignPath eligibility for this project.** Not applied for. Unknown: whether a single-maintainer project satisfies the
-  author/reviewer/approver role requirement, and whether the Foundation accepts a project whose first release is the
-  one to be signed.
+- **SignPath acceptance of this project.** Not applied for yet. Unknown: whether SignPath Foundation accepts a
+  single-maintainer project in which one person is author, reviewer and approver (the terms speak of "team members"
+  and do not say whether a team of one is enough), and whether an unsigned beta counts as "already released in the form
+  that should be signed".
 - **Smart App Control and SignPath Foundation certificates.** Microsoft says Smart App Control "only considers
-  certificates issued by trusted providers" and names Artifact Signing as preferred; I found no statement either way
-  about SignPath Foundation's certificate. Test with a real signed build on a machine with Smart App Control in
-  enforcement mode before relying on it.
-- **Azure eligibility.** The maintainer's country was not checked against the list above (individuals: US or Canada only).
-- **Reputation across certificate rotation.** Azure certificates last three days; Microsoft's reputation text is about
-  publisher identity and file hash, and I could not confirm in the documentation how reputation behaves across the
-  rotating certificates.
-- **The workflow's signing and attestation jobs have not run.** Signing needs real accounts, and attestation needs a tag.
-  The dry run covers build, bundle and checksums only; the first signed tag is the first test of the rest.
+  certificates issued by trusted providers" and names Azure Artifact Signing as "the preferred way"; I found no
+  statement either way about SignPath Foundation's certificate. Test the first signed build on a machine with Smart App
+  Control in enforcement mode before relying on it; if it is refused, the Azure fallback is the answer.
+- **The exact certificate subject.** The workflow expects `CN=SignPath Foundation` in the signer subject, from the
+  terms ("issued to SignPath Foundation"); the full subject string has not been seen on a real signed file.
+- **Whether SignPath passes unlisted files in a zip through unchanged.** Its artifact configuration docs do not say,
+  which is why `installer-setup` holds the setup exe alone instead of sending the whole `installer` artifact.
+- **MFA.** The policy requires it; whether it is on for the maintainer's GitHub account was not checked here.
+- **Azure eligibility** (fallback only). The maintainer's country was not checked against the list above
+  (individuals: US or Canada only).
+- **Reputation across certificate rotation** (fallback only). Azure certificates last three days; Microsoft's
+  reputation text is about publisher identity and file hash, and I could not confirm in the documentation how
+  reputation behaves across the rotating certificates.
+- **The workflow's signing and attestation jobs have not run.** Signing needs an accepted SignPath project, and
+  attestation needs a tag. The dry run covers build, bundle and checksums only; the first signed tag is the first
+  test of the rest.
 - **The Tauri build assumptions.** The workflow assumes `@tauri-apps/cli` in `ui/package.json` and `src-tauri/` beside
   `ui/` (`tauri build --no-bundle`, then `tauri bundle --bundles nsis`), and that the build works with
   `npm ci --ignore-scripts`. `@tauri-apps/cli` is now in `ui/package.json` and `src-tauri/` sits beside `ui/`, but the
@@ -162,12 +226,15 @@ releases are unsigned too and fall under the same Smart App Control rule; the sa
 - Artifact Signing signing integrations (auth, role, timestamp): https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations
 - Artifact Signing pricing (Basic $9.99 per month, Premium $99.99; via search result, the pricing page itself was not
   fetched): https://azure.microsoft.com/pricing/details/artifact-signing/
-- Azure/artifact-signing-action (inputs read from its `action.yml` at the pinned commit):
+- Azure/artifact-signing-action (fallback; inputs were read from its `action.yml` at commit `c7ab2a8`, v2.0.0):
   https://github.com/Azure/artifact-signing-action
 - SignPath Foundation terms (eligibility and conditions): https://signpath.org/terms
 - SignPath GitHub trusted build system (artifact upload, GitHub-hosted runners, permissions):
   https://docs.signpath.io/trusted-build-systems/github
-- SignPath action inputs (`action.yml` at v2 and v3 tags): https://github.com/SignPath/github-action-submit-signing-request
+- SignPath action inputs (`action.yml` at commit `f6d04783b4569d051e0c80105fe66e82819d0092`, the `v3` tag):
+  https://github.com/SignPath/github-action-submit-signing-request
+- SignPath artifact configuration syntax (root element, zip root, a wildcard matches exactly one file by default):
+  https://docs.signpath.io/artifact-configuration/syntax
 - OV code signing: hardware key rule since 2023-06-01 and indicative prices (vendor pages, not independent):
   https://www.thesslstore.com/blog/code-signing-price-changes-as-cas-align-with-new-industry-standards/ and
   https://sectigo.com/signing-certificates/code-signing

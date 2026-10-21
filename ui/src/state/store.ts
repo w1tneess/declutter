@@ -378,8 +378,12 @@ export const binWording = (n: number) =>
 
 /** Drops pinned paths right before acting: a pin added after the scan still protects its files. */
 export function unpinned(paths: string[]): string[] {
-  const pins = get().settings?.pins ?? [];
-  return paths.filter((p) => !pins.some((x) => p === x || p.startsWith(x + '\\')));
+  // Windows paths are case-insensitive, and a pin may end with a slash.
+  const pins = (get().settings?.pins ?? []).map((x) => x.replace(/[\\/]+$/, '').toLowerCase());
+  return paths.filter((p) => {
+    const l = p.toLowerCase();
+    return !pins.some((x) => l === x || l.startsWith(x + '\\'));
+  });
 }
 
 export async function exportCsv(name: string, payload: ExportPayload) {

@@ -47,7 +47,8 @@ undo log is written only for moves that happened.
 "moves": [{"src", "dst"}]}`, newest last, capped at 20 batches, written atomically (temp + replace). An old
 `%APPDATA%\Declutter\undo.json` is migrated once. Undo reverses the newest batch in reverse order: refuses paths
 that are not absolute or contain a protected part, skips missing or linked destinations, restores to a free name
-(` (1)`), then removes the now-empty category folder (and `Images` after `Images/Screenshots|Chat`). A damaged
+(` (1)`), then removes the now-empty category folder and its parent if that is empty too (`Images` after
+`Images/Screenshots|Chat`, a preset's `Work` after `Work/2024`), never above the folder the file went back to. A damaged
 entry is reported as `Skipped a damaged log entry.` A missing or non-list log is treated as empty.
 
 **Duplicates.** Candidates: size >= `min_size` (default 1), not online-only, not `.lnk .url .ini` or dead

@@ -192,7 +192,7 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
 
   const api: Api & { lastExport: unknown } = {
     lastExport: null,
-    appInfo: async () => ({ version: '1.0.0', dataDir: `${HOME}\\AppData\\Local\\Declutter` }),
+    appInfo: async () => ({ version: '1.0.0' }),
     quickFolders: async () => ({ downloads: `${HOME}\\Downloads`, desktop: `${HOME}\\Desktop`, documents: `${HOME}\\Documents` }),
     pickFolder: async () => (options.pick === undefined ? `${HOME}\\Downloads` : options.pick),
     pickSavePath: async (name) => `${HOME}\\Documents\\${name}`,

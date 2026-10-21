@@ -9,7 +9,7 @@ preview; the real one is selected when `window.__TAURI_INTERNALS__` exists.
 ## Commands
 | Command | Args | Returns | Notes |
 |---|---|---|---|
-| `app_info` | | `AppInfo` | version, data dir |
+| `app_info` | | `AppInfo` | version |
 | `quick_folders` | | `QuickFolders` | shell-resolved Downloads/Desktop/Documents |
 | `pick_folder` | | `string \| null` | native folder dialog |
 | `check_folder` | `path` | `FolderCheck` | same rules and reasons as `check_root` |

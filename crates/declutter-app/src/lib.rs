@@ -94,7 +94,6 @@ impl App {
     pub fn app_info(&self) -> AppInfo {
         AppInfo {
             version: env!("CARGO_PKG_VERSION").into(),
-            data_dir: dto_path(&self.platform.data_dir()),
         }
     }
 

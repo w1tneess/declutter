@@ -4,6 +4,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -268,7 +269,8 @@ fn focus_main_window(app: &AppHandle) {
 /// `--remind` (started by the scheduled task): no window, one notification if files are waiting, then exit.
 fn remind(handle: AppHandle, app: Arc<App>) {
     std::thread::spawn(move || {
-        if let Ok(Some(text)) = app.remind() {
+        // A panic in the scan must still reach `exit`, or a windowless process lingers.
+        if let Ok(Ok(Some(text))) = catch_unwind(AssertUnwindSafe(|| app.remind())) {
             let _ = handle
                 .notification()
                 .builder()

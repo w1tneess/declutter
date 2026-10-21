@@ -14,7 +14,7 @@ import { Similar } from './screens/Similar';
 import { Sort } from './screens/Sort';
 import { cancelScan, chooseFolder, counts, go, init, useApp, type Page } from './state/store';
 
-const SCREENS: Record<Page, () => React.JSX.Element> = {
+const SCREENS: Record<Page, () => React.JSX.Element | null> = {
   home: Home, sort: Sort, duplicates: Duplicates, similar: Similar, largeOld: LargeOld, empty: EmptyFolders, settings: Settings,
 };
 const ORDER: Page[] = ['home', 'sort', 'duplicates', 'similar', 'largeOld', 'empty', 'settings'];

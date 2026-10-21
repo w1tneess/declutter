@@ -15,6 +15,8 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // No React Compiler in this build, so its "cannot memoize" notice about useVirtualizer does not apply.
+      'react-hooks/incompatible-library': 'off',
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-restricted-properties': ['error', { property: 'innerHTML' }, { property: 'outerHTML' }],

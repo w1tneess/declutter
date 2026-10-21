@@ -67,7 +67,7 @@ export function Duplicates() {
   const [q, setQ] = useState('');
   const query = useDeferredValue(q);
 
-  const { rows, shownGroups, shownPairs } = useMemo(() => {
+  const { rows, shownGroups } = useMemo(() => {
     const rows: Row[] = [];
     const shownGroups: DupGroup[] = [];
     const shownPairs: Redownload[] = [];
@@ -78,7 +78,7 @@ export function Duplicates() {
     });
     for (const p of redl ?? []) if (matches(query, baseName(p.copy.path), baseName(p.original.path))) shownPairs.push(p);
     if (shownPairs.length) rows.push({ t: 'section', n: shownPairs.length }, ...shownPairs.map((p) => ({ t: 'redl' as const, p })));
-    return { rows, shownGroups, shownPairs };
+    return { rows, shownGroups };
   }, [groups, redl, query]);
 
   const selectable = (r: Row) => r.t === 'redl' || (r.t === 'file' && !keep.has(r.f.path));

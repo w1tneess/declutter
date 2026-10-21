@@ -153,15 +153,16 @@ export function EmptyState({ icon = 'broom', title, children, action }: { icon?:
 }
 
 /** Shows `text` while the trigger is hovered or focused (CSS); Esc hides it (WCAG 1.4.13). */
-export function Tooltip({ text, children }: { text: string; children: ReactElement<{ 'aria-describedby'?: string; onKeyDown?: (e: KeyboardEvent) => void; onBlur?: () => void }> }) {
+export function Tooltip({ text, children }: { text: string; children: ReactElement<{ 'aria-describedby'?: string; onKeyDown?: (e: KeyboardEvent) => void; onBlur?: () => void; onMouseEnter?: () => void }> }) {
   const id = useId();
   const [hidden, setHidden] = useState(false);
   return (
-    <span className={cx('tip-wrap', hidden && 'is-dismissed')} onMouseLeave={() => setHidden(false)}>
+    <span className={cx('tip-wrap', hidden && 'is-dismissed')}>
       {cloneElement(children, {
         'aria-describedby': id,
         onKeyDown: (e: KeyboardEvent) => e.key === 'Escape' && setHidden(true),
         onBlur: () => setHidden(false),
+        onMouseEnter: () => setHidden(false),
       })}
       <span role="tooltip" id={id} className="tip">{text}</span>
     </span>

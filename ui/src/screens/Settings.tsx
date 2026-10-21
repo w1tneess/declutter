@@ -198,7 +198,7 @@ export function Settings() {
         <Card>
           <h2 className="card-title">Space and Recycle Bin</h2>
           <Row label="Space freed with Declutter" desc={freed ? `${humanSize(freed.bytes)} in ${plural(freed.files, 'file')}${freed.since ? ` since ${freed.since}` : ''}. Counted on this computer only.` : 'Loading…'}>
-            <Button onClick={() => void confirm({ title: 'Reset the tally?', body: 'Start counting freed space from zero? Your files are not affected.', confirmLabel: 'Reset' }).then((ok) => ok && run(api.resetSpaceFreed(), setFreed))}>Reset</Button>
+            <Button onClick={() => void confirm({ title: 'Reset the tally?', body: 'Start counting freed space from zero? Your files are not affected.', confirmLabel: 'Reset' }).then((ok) => { if (ok) void run(api.resetSpaceFreed(), setFreed); })}>Reset</Button>
           </Row>
           <Row label="Recycle Bin" desc={bin ? `Holds ${humanSize(bin.bytes)} in ${plural(bin.items, 'item')}. Restore or empty it in File Explorer.` : 'Loading…'}>
             <Button icon="delete" onClick={() => void run(api.openRecycleBin(), () => undefined)}>Open Recycle Bin</Button>

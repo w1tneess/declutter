@@ -11,35 +11,40 @@ export function DialogHost() {
   const id = useId();
 
   useEffect(() => {
-    if (!d) return;
+    const el = ref.current;
+    if (!d || !el) return;
     const before = document.activeElement as HTMLElement | null;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        closeDialog(false);
+      } else if (e.key === 'Tab') {
+        const items = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)];
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (!first || !last) return;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
     // The confirm button gets focus, except for alerts with a single OK there is nothing else to pick anyway.
-    ref.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
-    return () => before?.focus?.();
+    el.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    el.addEventListener('keydown', onKeyDown);
+    return () => {
+      el.removeEventListener('keydown', onKeyDown);
+      before?.focus?.();
+    };
   }, [d]);
 
   if (!d) return null;
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      closeDialog(false);
-    } else if (e.key === 'Tab') {
-      const items = [...(ref.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (!first || !last) return;
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  };
   return (
     <div className="scrim">
-      <div ref={ref} className="dialog" role={d.cancelLabel === null ? 'alertdialog' : 'dialog'} aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`} onKeyDown={onKeyDown}>
+      <div ref={ref} className="dialog" role={d.cancelLabel === null ? 'alertdialog' : 'dialog'} aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`}>
         <h2 id={`${id}-t`} className="dialog-title">{d.title}</h2>
         <div id={`${id}-b`} className="dialog-body">{d.body}</div>
         <div className="dialog-actions">

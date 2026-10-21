@@ -40,6 +40,8 @@ jobs:
           key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: rust-${{ runner.os }}-
       - name: Test (golden fixtures run here; also exports TypeScript bindings)
+        env:
+          GOLDEN_STRICT: '1' # every oracle fixture must pass; none may stay pending
         run: cargo test --workspace --locked -- --nocapture
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings

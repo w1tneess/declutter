@@ -660,8 +660,9 @@ fn unpinned(pins: &[PathBuf], paths: Vec<PathBuf>, errors: &mut Vec<String>) -> 
         .collect()
 }
 
-/// For each removal, the stored group holding every path it names, with those paths spelled as the scan did.
-/// A removal naming paths outside one stored group is refused.
+/// For each stored group, every path the removals name in it, spelled as the scan did and without repeats.
+/// Removals naming the same group are merged, so the keep-one check sees the whole selection. A removal naming
+/// paths outside one stored group is refused.
 fn pick_groups<'a, G: Clone>(
     groups: &[G],
     paths_of: impl Fn(&G) -> Vec<String>,
@@ -674,7 +675,7 @@ fn pick_groups<'a, G: Clone>(
             index.insert(key(&p), (i, p));
         }
     }
-    let mut out = Vec::new();
+    let mut picked: Vec<(usize, Vec<String>)> = Vec::new();
     for remove in removals.filter(|r| !r.is_empty()) {
         let hits: Option<Vec<&(usize, String)>> =
             remove.iter().map(|p| index.get(&key(p))).collect();
@@ -683,11 +684,24 @@ fn pick_groups<'a, G: Clone>(
             h.iter().all(|(j, _)| *j == i).then_some(i)
         });
         match (group, hits) {
-            (Some(i), Some(hits)) => out.push((groups[i].clone(), hits.into_iter().map(|(_, p)| p.clone()).collect())),
+            (Some(i), Some(hits)) => {
+                let at = picked.iter().position(|(j, _)| *j == i).unwrap_or_else(|| {
+                    picked.push((i, Vec::new()));
+                    picked.len() - 1
+                });
+                for (_, p) in hits {
+                    if !picked[at].1.contains(p) {
+                        picked[at].1.push(p.clone());
+                    }
+                }
+            }
             _ => errors.push("Skipped a group that was not in the last scan of this folder. Scan again and retry.".into()),
         }
     }
-    out
+    picked
+        .into_iter()
+        .map(|(i, remove)| (groups[i].clone(), remove))
+        .collect()
 }
 
 /// `%SystemRoot%\explorer.exe` by full path, so nothing on PATH can stand in for it.
@@ -744,5 +758,23 @@ mod tests {
             vec![(groups[0].clone(), vec![r"C:\r\A.txt".to_string()])]
         );
         assert_eq!(errors.len(), 2, "{errors:?}");
+    }
+
+    #[test]
+    fn pick_groups_merges_removals_on_the_same_group() {
+        let groups = vec![vec![r"C:\r\A.txt".to_string(), r"C:\r\b.txt".into()]];
+        let removals = [
+            vec![r"C:\r\a.txt".to_string()],
+            vec![r"C:\r\B.txt".to_string(), r"c:\r\A.TXT".into()],
+        ];
+        let mut errors = Vec::new();
+        let picked = pick_groups(
+            &groups,
+            |g: &Vec<String>| g.clone(),
+            removals.iter(),
+            &mut errors,
+        );
+        assert_eq!(picked, vec![(groups[0].clone(), groups[0].clone())]);
+        assert!(errors.is_empty(), "{errors:?}");
     }
 }

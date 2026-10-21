@@ -630,6 +630,60 @@ fn similar_removals_keep_one_picture_per_group() {
     nothing_recycled(&e);
 }
 
+/// Older than the fake clock, so the core's "just changed" rule (SPEC rule 8) does not hold the file back.
+fn make_old(p: &Path) {
+    fs::File::options()
+        .write(true)
+        .open(p)
+        .unwrap()
+        .set_modified(UNIX_EPOCH + Duration::from_secs(1_699_990_000))
+        .unwrap();
+}
+
+#[test]
+fn removals_split_across_entries_still_keep_one_per_group() {
+    let e = env(FakeEngine::default());
+    for name in ["dup1.bin", "dup2.bin", "pic1.png", "pic2.png"] {
+        make_old(&e.root.join(name));
+    }
+    let events = run(&e, &e.root, options(true), false);
+    let root = dto(&e.root);
+    let one = |p: &str| vec![dto(&e.root.join(p))];
+    let dups = events
+        .iter()
+        .find_map(|ev| match ev {
+            ScanEvent::Duplicates { groups } => groups.first().cloned(),
+            _ => None,
+        })
+        .unwrap();
+    let removals: Vec<DupRemoval> = ["dup1.bin", "dup2.bin"]
+        .map(|p| DupRemoval {
+            group: dups.clone(),
+            remove: one(p),
+        })
+        .into();
+    let r = e.app.trash_duplicates(&root, &removals).unwrap();
+    assert_eq!((r.count, r.errors.len()), (0, 1), "{:?}", r.errors);
+    assert!(r.errors[0].contains("Keep at least one"));
+    let similar = events
+        .iter()
+        .find_map(|ev| match ev {
+            ScanEvent::Similar { groups } => groups.first().cloned(),
+            _ => None,
+        })
+        .unwrap();
+    let removals: Vec<SimilarRemoval> = ["pic1.png", "pic2.png"]
+        .map(|p| SimilarRemoval {
+            group: similar.clone(),
+            remove: one(p),
+        })
+        .into();
+    let r = e.app.trash_similar(&root, &removals).unwrap();
+    assert_eq!((r.count, r.errors.len()), (0, 1), "{:?}", r.errors);
+    assert!(r.errors[0].contains("keep at least one"));
+    nothing_recycled(&e);
+}
+
 #[test]
 fn export_only_writes_csv_files_on_local_drives() {
     let e = env(FakeEngine::default());
@@ -654,13 +708,7 @@ fn remind_with_no_saved_folder_says_nothing() {
 #[test]
 fn an_offered_file_goes_to_the_bin_and_is_tallied() {
     let e = env(FakeEngine::default());
-    // Older than the fake clock, so the core's "just changed" rule (SPEC rule 8) does not hold it back.
-    fs::File::options()
-        .write(true)
-        .open(e.root.join("a.txt"))
-        .unwrap()
-        .set_modified(UNIX_EPOCH + Duration::from_secs(1_699_990_000))
-        .unwrap();
+    make_old(&e.root.join("a.txt"));
     run(&e, &e.root, options(false), false);
     let r = e
         .app

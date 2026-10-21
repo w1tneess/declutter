@@ -120,7 +120,6 @@ impl Engine for FakeEngine {
             remember_last_folder: true,
             pins: self.pins.lock().unwrap().clone(),
             active_preset: None,
-            reminder_enabled: false,
         }
     }
     fn walk(&self, ctx: &Ctx, root: &Path, _: &[PathBuf]) -> Scan {

@@ -46,7 +46,7 @@ describe('unpinned', () => {
   it('drops pinned paths and anything inside them, ignoring case', async () => {
     const { unpinned, useApp } = await import('./store');
     const p = (s: string) => s.replaceAll('/', '\\');
-    useApp.setState({ settings: { theme: 'system', recentHours: 24, minMb: 0, olderDays: 0, lastFolder: null, rememberLastFolder: false, pins: [p('C:/D/Keep/')], activePreset: null, reminderEnabled: false } });
+    useApp.setState({ settings: { theme: 'system', recentHours: 24, minMb: 0, olderDays: 0, lastFolder: null, rememberLastFolder: false, pins: [p('C:/D/Keep/')], activePreset: null } });
     expect(unpinned([p('C:/D/keep'), p('c:/d/KEEP/a.txt'), p('C:/D/Keeper.txt'), p('C:/D/x.txt')])).toEqual([p('C:/D/Keeper.txt'), p('C:/D/x.txt')]);
   });
 });

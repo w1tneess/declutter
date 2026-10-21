@@ -167,7 +167,6 @@ dto! {
         pub remember_last_folder: bool,
         pub pins: Vec<String>,
         pub active_preset: Option<String>,
-        pub reminder_enabled: bool,
     }
 }
 

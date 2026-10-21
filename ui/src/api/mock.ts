@@ -150,7 +150,7 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
   let reminder: ReminderStatus = { enabled: false, nextRun: null };
   let settings: Settings = {
     theme: 'system', recentHours: 24, minMb: 100, olderDays: 0, lastFolder: null, rememberLastFolder: false,
-    pins: [], activePreset: null, reminderEnabled: false,
+    pins: [], activePreset: null,
   };
   const builtins: Preset[] = [
     { id: 'downloads', name: 'Downloads', builtin: true, rules: [{ extensions: ['.exe', '.msi'], folder: 'Installers' }, { extensions: ['.pdf', '.docx'], folder: 'Documents' }, { extensions: ['.zip', '.7z'], folder: 'Archives' }] },

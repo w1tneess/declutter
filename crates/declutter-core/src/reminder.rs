@@ -65,8 +65,10 @@ fn schtasks<S: AsRef<OsStr>>(args: &[S]) -> std::io::Result<Output> {
 fn decode(bytes: &[u8]) -> String {
     if bytes.starts_with(&[0xFF, 0xFE]) || bytes.get(1) == Some(&0) {
         let units: Vec<u16> = bytes
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&c| u16::from_le_bytes(c))
             .collect();
         String::from_utf16_lossy(&units)
             .trim_start_matches('\u{feff}')

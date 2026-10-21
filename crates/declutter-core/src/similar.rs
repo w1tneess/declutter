@@ -202,7 +202,7 @@ pub fn find_similar(ctx: &Ctx, entries: &[Entry], max_distance: u32) -> Vec<Simi
                     .then(b.entry.size.cmp(&a.entry.size))
                     .then_with(|| a.entry.path.cmp(&b.entry.path))
             });
-            let first = members[0].hash;
+            let first = members[0].hash; // every group has at least two members (filter above)
             let reclaimable = members
                 .iter()
                 .skip(1)

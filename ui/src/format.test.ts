@@ -18,7 +18,7 @@ describe('format', () => {
   });
 
   it('relPath is relative to the chosen folder, case-insensitively', () => {
-    expect(relPath(String.raw`C:\Users\A\Downloads\x\y.txt`, String.raw`c:\users\a\downloads\ `.trim())).toBe(String.raw`x\y.txt`);
+    expect(relPath(String.raw`C:\Users\A\Downloads\x\y.txt`, 'c:\\users\\a\\downloads\\')).toBe(String.raw`x\y.txt`);
     expect(relPath(String.raw`C:\Users\A\Downloads`, String.raw`C:\Users\A\Downloads`)).toBe('.');
     expect(relPath(String.raw`D:\other.txt`, String.raw`C:\Users\A\Downloads`)).toBe(String.raw`D:\other.txt`);
   });

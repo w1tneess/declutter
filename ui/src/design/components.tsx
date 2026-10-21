@@ -100,9 +100,9 @@ export function NumberField({ label, hint, value, min, max, onCommit, className,
     setText(String(value));
   }
   const n = Number(text);
-  const bad = text.trim() === '' || !Number.isFinite(n) || n < min || (max !== undefined && n > max);
+  const bad = text.trim() === '' || !Number.isInteger(n) || n < min || (max !== undefined && n > max);
   const commit = () => {
-    if (!bad && n !== value) onCommit(Math.round(n));
+    if (!bad && n !== value) onCommit(n);
   };
   const range = max === undefined ? `${min} or more` : `${min} to ${max}`;
   return (
@@ -110,7 +110,7 @@ export function NumberField({ label, hint, value, min, max, onCommit, className,
       className={cx('field-number', className)}
       label={label}
       hint={hint}
-      error={bad ? `Enter a number from ${range}.` : null}
+      error={bad ? `Enter a whole number from ${range}.` : null}
       value={text}
       inputMode="numeric"
       onChange={setText}

@@ -87,6 +87,12 @@ export function Settings() {
   const [bin, setBin] = useState<BinInfo | null>(null);
   const [reminder, setReminder] = useState<ReminderStatus | null>(null);
   const [editing, setEditing] = useState<Preset | null>(null);
+  // Each New / Copy / Edit opens a fresh editor, even when the previous draft had the same (empty) id.
+  const [session, setSession] = useState(0);
+  const edit = (p: Preset) => {
+    setEditing(p);
+    setSession((n) => n + 1);
+  };
 
   useEffect(() => {
     api.spaceFreed().then(setFreed, () => undefined);
@@ -160,9 +166,9 @@ export function Settings() {
         <Card>
           <h2 className="card-title">Sort presets</h2>
           <Row label="Your own sort rules" desc="Choose which file types go to which folder. Pick a preset on the Sort tab.">
-            <Button icon="add" onClick={() => setEditing({ id: '', name: '', builtin: false, rules: [{ extensions: [], folder: '' }] })}>New preset</Button>
+            <Button icon="add" onClick={() => edit({ id: '', name: '', builtin: false, rules: [{ extensions: [], folder: '' }] })}>New preset</Button>
           </Row>
-          {editing && <PresetEditor key={editing.id || 'new'} preset={editing} onDone={() => setEditing(null)} />}
+          {editing && <PresetEditor key={session} preset={editing} onDone={() => setEditing(null)} />}
           <ul className="plain-list presets">
             {presets.map((p) => (
               <li key={p.id}>
@@ -170,10 +176,10 @@ export function Settings() {
                 {p.builtin && <Badge>Built-in</Badge>}
                 <span className="setting-desc">{p.rules.map((r) => `${r.folder}: ${r.extensions.join(' ')}`).join(' · ')}</span>
                 {p.builtin ? (
-                  <Button variant="subtle" onClick={() => setEditing({ ...p, id: '', builtin: false, name: `${p.name} (copy)` })}>Make a copy</Button>
+                  <Button variant="subtle" onClick={() => edit({ ...p, id: '', builtin: false, name: `${p.name} (copy)` })}>Make a copy</Button>
                 ) : (
                   <>
-                    <Button variant="subtle" onClick={() => setEditing(p)}>Edit</Button>
+                    <Button variant="subtle" onClick={() => edit(p)}>Edit</Button>
                     <Button variant="subtle" onClick={() => void removePreset(p)}>Delete</Button>
                   </>
                 )}

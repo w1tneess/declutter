@@ -21,6 +21,7 @@ const sizePair = (a: number, b: number) => (humanSize(a) !== humanSize(b) ? `${h
 
 const DupRow = memo(function DupRow({ row }: RowProps<Row>) {
   const keep = useApp((s) => s.keep);
+  useSelectionVersion(keep); // the Keep badge must follow "Keep this one"
   const folder = useApp((s) => s.folder);
   switch (row.t) {
     case 'group':

@@ -76,9 +76,10 @@ export function LargeOld() {
     const mine = new Set((leftovers ?? []).map((x) => x.path));
     const shownLarge = (large ?? []).filter((f) => !mine.has(f.path) && matches(query, baseName(f.path)));
     const rows: Row[] = [];
-    if (left.length) rows.push({ t: 'head', text: `Likely leftovers (${left.length}).`, note: 'Look at each one before you tick it. Nothing is ticked.' }, ...left.map((x) => ({ t: 'left' as const, x })));
+    if (left.length) rows.push({ t: 'head', text: `Likely leftovers (${left.length}).`, note: 'Look at each one before you tick it. Nothing is ticked.' });
+    for (const x of left) rows.push({ t: 'left', x });
     if (left.length && shownLarge.length) rows.push({ t: 'head', text: 'Large and old files' });
-    rows.push(...shownLarge.map((f) => ({ t: 'file' as const, f })));
+    for (const f of shownLarge) rows.push({ t: 'file', f }); // a loop: spreading 100,000+ arguments can overflow the stack
     return { rows, shownLarge };
   }, [large, leftovers, query]);
 

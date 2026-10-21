@@ -34,16 +34,16 @@ function ratio(a: string, b: string): number {
 const BACKGROUNDS = ['bg', 'surface', 'surface-alt', 'surface-hover', 'selected'];
 // [foreground, backgrounds, minimum]
 const PAIRS: [string, string[], number][] = [
-  ['text', BACKGROUNDS, 4.5],
-  ['text-muted', BACKGROUNDS, 4.5],
+  ['text', [...BACKGROUNDS, 'accent-soft'], 4.5],
+  ['text-muted', [...BACKGROUNDS, 'accent-soft'], 4.5],
   ['accent-text', [...BACKGROUNDS, 'accent-soft'], 4.5],
-  ['danger-text', ['surface', 'bg'], 4.5],
+  ['danger-text', ['surface', 'surface-alt', 'bg'], 4.5],
   ['warning-text', ['surface', 'surface-alt'], 4.5],
   ['success-text', ['surface', 'bg'], 4.5],
   ['on-accent', ['accent', 'accent-hover'], 4.5],
   ['on-danger', ['danger', 'danger-hover'], 4.5],
   ['border-control', ['bg', 'surface', 'surface-alt', 'surface-hover'], 3],
-  ['focus', ['bg', 'surface', 'surface-alt', 'selected', 'accent-soft'], 3],
+  ['focus', ['bg', 'surface', 'surface-alt', 'surface-hover', 'selected', 'accent-soft'], 3],
   ['accent', ['bg', 'surface', 'track'], 3],
 ];
 

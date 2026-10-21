@@ -169,7 +169,8 @@ export async function refreshUndo() {
 // ---------- folder and scan ----------
 
 export async function chooseFolder(path?: string, quiet = false) {
-  if (get().status === 'scanning' || get().busy) {
+  const { status, busy } = get();
+  if (status === 'scanning' || status === 'cancelling' || busy) {
     toast('Please wait for the current job to finish (or press Cancel).');
     return;
   }
@@ -181,6 +182,7 @@ export async function chooseFolder(path?: string, quiet = false) {
       if (!quiet) await alert("Can't use this folder", check.reason);
       return;
     }
+    token++; // events from any earlier scan must not land on the new folder
     set({ folder: p, results: {}, sel: freshSelections(), keep: new Selection(), status: 'idle', progress: null, message: 'Folder chosen. Press Scan.' });
     const s = get().settings;
     if (s?.rememberLastFolder && s.lastFolder !== p) void updateSettings({ lastFolder: p });
@@ -200,6 +202,7 @@ export async function startScan() {
   const { folder, settings, similarImages, status, busy } = get();
   if (!folder || !settings || busy || status === 'scanning' || status === 'cancelling') return;
   const mine = ++token;
+  scanId = null; // Cancel before the new id arrives must not target the previous scan
   queue = [];
   set({
     status: 'scanning', progress: null, message: 'Reading the folder…', results: {}, sel: freshSelections(), keep: new Selection(),

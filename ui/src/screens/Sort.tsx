@@ -47,8 +47,12 @@ export function Sort() {
     const visible: Move[] = [];
     for (const cat of [...by.keys()].sort()) {
       const ms = by.get(cat) ?? [];
-      rows.push({ head: true, cat, n: ms.length, bytes: ms.reduce((a, m) => a + m.size, 0) }, ...ms.map((m) => ({ m })));
-      visible.push(...ms);
+      rows.push({ head: true, cat, n: ms.length, bytes: ms.reduce((a, m) => a + m.size, 0) });
+      // Plain loops: spreading 100,000+ arguments into push() can overflow the stack.
+      for (const m of ms) {
+        rows.push({ m });
+        visible.push(m);
+      }
     }
     return { rows, visible };
   }, [plan, query]);

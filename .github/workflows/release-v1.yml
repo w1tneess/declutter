@@ -80,7 +80,7 @@ jobs:
 
   sign-app:
     # Skipped (not failed) on a dry run or when no signing provider is configured.
-    if: github.event_name == 'push' && vars.SIGNING_PROVIDER == 'azure'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v1.') && vars.SIGNING_PROVIDER == 'azure'
     needs: build
     runs-on: windows-latest
     timeout-minutes: 15
@@ -173,7 +173,7 @@ jobs:
           retention-days: 7
 
   sign-installer:
-    if: github.event_name == 'push' && vars.SIGNING_PROVIDER == 'azure'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v1.') && vars.SIGNING_PROVIDER == 'azure'
     needs: bundle
     runs-on: windows-latest
     timeout-minutes: 15
@@ -238,8 +238,8 @@ jobs:
           retention-days: 7
 
   publish:
-    # Tag push only (the trigger allows nothing else): the dry run never gets a write token.
-    if: github.event_name == 'push'
+    # A v1.* tag push only, whatever the triggers above become: no branch push and no dry run gets a write token.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v1.')
     needs: checksums
     runs-on: ubuntu-latest
     # Runs no code from the build, only the pinned actions below and gh/sha256sum on the files it produced.

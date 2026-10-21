@@ -574,17 +574,17 @@ impl App {
     }
 
     pub fn reminder_status(&self) -> ReminderStatus {
-        reminder::status(&self.ctx())
+        reminder::status()
     }
 
     pub fn reminder_enable(&self) -> Result<ReminderStatus, String> {
         let exe = std::env::current_exe()
             .map_err(|_| "Could not find Declutter's program file.".to_string())?;
-        reminder::enable(&self.ctx(), &exe)
+        reminder::enable(&exe)
     }
 
     pub fn reminder_disable(&self) -> Result<ReminderStatus, String> {
-        reminder::disable(&self.ctx())
+        reminder::disable()
     }
 
     /// `declutter --remind`: scan the saved folder and return the notification text (None: nothing to say).

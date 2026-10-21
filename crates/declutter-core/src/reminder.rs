@@ -11,7 +11,6 @@ use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Output};
 
-use crate::ctx::Ctx;
 use crate::model::ReminderStatus;
 
 pub const TASK_NAME: &str = "Declutter reminder";
@@ -101,7 +100,7 @@ fn off() -> ReminderStatus {
     }
 }
 
-pub fn enable(ctx: &Ctx, exe: &Path) -> Result<ReminderStatus, String> {
+pub fn enable(exe: &Path) -> Result<ReminderStatus, String> {
     let args = create_args(exe)?;
     let out =
         schtasks(args.as_slice()).map_err(|e| format!("Could not turn on the reminder: {e}"))?;
@@ -111,11 +110,11 @@ pub fn enable(ctx: &Ctx, exe: &Path) -> Result<ReminderStatus, String> {
             decode(&out.stderr).trim()
         ));
     }
-    Ok(status(ctx))
+    Ok(status())
 }
 
 /// Deleting a task that is not there fails, which is the state asked for, so the result is judged by a fresh query.
-pub fn disable(ctx: &Ctx) -> Result<ReminderStatus, String> {
+pub fn disable() -> Result<ReminderStatus, String> {
     let deleted = schtasks(&["/Delete", "/TN", TASK_NAME, "/F"]);
     if query(&["/Query", "/TN", TASK_NAME]).is_some() {
         let why = match deleted {
@@ -124,11 +123,11 @@ pub fn disable(ctx: &Ctx) -> Result<ReminderStatus, String> {
         };
         return Err(format!("Could not turn off the reminder: {why}"));
     }
-    Ok(status(ctx))
+    Ok(status())
 }
 
-/// `ctx` is unused today: the task itself is the source of truth, not a setting.
-pub fn status(_ctx: &Ctx) -> ReminderStatus {
+/// The scheduled task itself is the source of truth, not a setting.
+pub fn status() -> ReminderStatus {
     let Some(xml) = query(&["/Query", "/TN", TASK_NAME, "/XML"]) else {
         return off();
     };

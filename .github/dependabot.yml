@@ -8,3 +8,12 @@ updates:
     directory: /
     schedule:
       interval: monthly
+  # 1.0 (Rust core, Tauri shell, React UI). The ui/ entry reports "not found" until that folder exists.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: monthly

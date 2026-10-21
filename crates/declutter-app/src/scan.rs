@@ -15,8 +15,6 @@ use declutter_core::{
     sort, walk, Ctx,
 };
 
-/// Hamming distance (of 64 bits) under which two pictures count as similar: the default `similar.rs` suggests.
-const SIMILAR_DISTANCE: u32 = 6;
 /// Rows in each Large & Old breakdown table.
 const BREAKDOWN_TOP: usize = 10;
 
@@ -83,7 +81,7 @@ pub trait Engine: Send + Sync {
         redownloads::find_redownloads(entries, exclude)
     }
     fn similar(&self, ctx: &Ctx, entries: &[Entry]) -> Vec<SimilarGroup> {
-        similar::find_similar(ctx, entries, SIMILAR_DISTANCE)
+        similar::find_similar(ctx, entries)
     }
 }
 

@@ -35,7 +35,7 @@ fn read_log(ctx: &Ctx) -> Vec<Value> {
         &log_path(ctx),
     );
     let text = std::fs::read_to_string(log_path(ctx)).unwrap_or_default();
-    match serde_json::from_str(&text) {
+    match serde_json::from_str::<Value>(&text) {
         Ok(Value::Array(batches)) => batches,
         _ => Vec::new(),
     }

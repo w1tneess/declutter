@@ -41,6 +41,8 @@ jobs:
           restore-keys: rust-${{ runner.os }}-
       # The Tauri shell embeds ui/dist at compile time, so it is checked separately below, once a frontend exists.
       - name: Test (golden fixtures run here; also exports TypeScript bindings)
+        env:
+          GOLDEN_STRICT: '1' # every oracle fixture must pass; none may stay pending
         run: cargo test --workspace --exclude declutter-shell --locked -- --nocapture
       - name: Frontend for the shell (the real UI when present, else a CI-only stand-in page)
         shell: pwsh

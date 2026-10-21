@@ -203,7 +203,9 @@ pub fn materialize(tree: &Value, root: &Path, now: f64) {
         if let Some(entries) = f.get("zip").and_then(Value::as_object) {
             let mut z = zip::ZipWriter::new(fs::File::create(&p).unwrap());
             for (name, text) in entries {
-                z.start_file(name.as_str(), zip::write::SimpleFileOptions::default()).unwrap();
+                // Python's ZipFile.writestr stores entries uncompressed; the fixtures' zip sizes depend on it.
+                let stored = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+                z.start_file(name.as_str(), stored).unwrap();
                 z.write_all(text.as_str().unwrap().as_bytes()).unwrap();
             }
             z.finish().unwrap();

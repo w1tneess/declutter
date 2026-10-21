@@ -207,3 +207,16 @@ fn undo_op(env: &Env, p: &Value) -> Value {
     out.insert("log_len_after_undo".into(), undo_log(env).len().into());
     Value::Object(out)
 }
+
+/// Not an oracle fixture (v0.2.2 had no presets): undoing a two-level preset sort removes both emptied folders.
+#[test]
+fn undo_removes_an_emptied_two_level_preset_folder() {
+    let env = Env::new(&json!({ "tree": { "files": [{ "path": "a.txt" }] } }));
+    let scan = walk::walk_files(&env.ctx, &env.root, &[]);
+    let work = |_: &walk::Entry| Some(vec!["Work".to_string(), "2024".to_string()]);
+    let plan = sort::plan_sort_with(&env.ctx, &env.root, &scan.entries, 0, &work).unwrap();
+    assert_eq!(sort::apply_moves(&env.ctx, &plan.moves, Some(&env.root), 0).count, 1);
+    assert_eq!(env.snapshot(), json!({ "files": ["Work/2024/a.txt"], "dirs": ["Work", "Work/2024"] }));
+    assert_eq!(undo::undo_last(&env.ctx).count, 1);
+    assert_eq!(env.snapshot(), json!({ "files": ["a.txt"], "dirs": [] }));
+}

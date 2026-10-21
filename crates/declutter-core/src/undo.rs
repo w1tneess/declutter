@@ -2,7 +2,7 @@
 //! The log is `<data_dir>/undo.json`, a JSON list of `{"time", "moves": [{"src", "dst"}]}` batches, newest last,
 //! capped at 20, written atomically. The schema and location must stay compatible with v0.2.2.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 
@@ -134,8 +134,14 @@ pub fn undo_last(ctx: &Ctx) -> ActionResult {
             continue;
         }
         restored += 1;
-        // Remove the now-empty category folder, and Images too after Images/Screenshots or Images/Chat.
-        for d in parent.ancestors().take(bucket_depth(dst)) {
+        // Remove the now-empty sort folders (`Images/Screenshots`, a preset's `Work/2024`): at most two levels,
+        // the most a sort creates, and only inside the folder the file went back to, whatever the log says.
+        let base = src.parent().unwrap_or(src);
+        for d in parent
+            .ancestors()
+            .take(2)
+            .take_while(|d| d.starts_with(base) && *d != base)
+        {
             if std::fs::remove_dir(d).is_err() {
                 break;
             }
@@ -147,19 +153,6 @@ pub fn undo_last(ctx: &Ctx) -> ActionResult {
     ActionResult {
         count: restored,
         errors,
-    }
-}
-
-/// 2 for `Images/Screenshots/x` and `Images/Chat/x`, else 1 (v0.2.2's `_bucket`).
-fn bucket_depth(dst: &Path) -> usize {
-    let mut up = dst.components().rev().skip(1).map(Component::as_os_str);
-    match (up.next(), up.next()) {
-        (Some(sub), Some(images))
-            if images == "Images" && (sub == "Screenshots" || sub == "Chat") =>
-        {
-            2
-        }
-        _ => 1,
     }
 }
 
@@ -286,13 +279,5 @@ mod tests {
         assert!(!log_path_ok(Path::new(r"a\b.txt")));
         assert!(!log_path_ok(Path::new(r"C:\Users\x\AppData\b.txt")));
         assert!(log_path_ok(Path::new(r"C:\Users\x\Downloads\b.txt")));
-    }
-
-    #[test]
-    fn bucket_depth_matches_v022() {
-        assert_eq!(bucket_depth(Path::new(r"C:\r\Images\Screenshots\a.png")), 2);
-        assert_eq!(bucket_depth(Path::new(r"C:\r\Images\Chat\a.png")), 2);
-        assert_eq!(bucket_depth(Path::new(r"C:\r\Images\a.png")), 1);
-        assert_eq!(bucket_depth(Path::new(r"C:\r\Docs\Screenshots\a.png")), 1);
     }
 }

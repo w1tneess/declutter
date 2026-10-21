@@ -269,9 +269,9 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
       return ok(moves.length);
     },
     trashPaths: async (_root, paths) => trash(paths),
-    trashDuplicates: async (_root, removals) => trash(removals.flatMap((r) => r.remove)),
+    trashDuplicates: async (_root, removals) => trash(removals.flat()),
     trashRedownloads: async (_root, pairs, removing) => trash(pairs.filter((p) => !removing.includes(p.original.path)).map((p) => p.copy.path)),
-    trashSimilar: async (_root, removals) => trash(removals.flatMap((r) => r.remove)),
+    trashSimilar: async (_root, removals) => trash(removals.flat()),
     trashEmptyDirs: async (_root, paths) => trash(paths),
     peekUndo: async () => (undo ? { folder: undo.folder, count: undo.count, ageSeconds: Math.floor((Date.now() - undo.at) / 1000) } : null),
     async undoLastSort() {

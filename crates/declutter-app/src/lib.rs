@@ -17,9 +17,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 use declutter_core::model::{
-    ActionResult, AppInfo, BinInfo, DupGroup, DupRemoval, ExportPayload, FolderCheck, Move, Phase,
-    Preset, QuickFolders, Redownload, ReminderStatus, ScanEvent, ScanOptions, Settings,
-    SimilarGroup, SimilarRemoval, SpaceFreed, UndoInfo,
+    ActionResult, AppInfo, BinInfo, DupGroup, ExportPayload, FolderCheck, Move, Phase, Preset,
+    QuickFolders, Redownload, ReminderStatus, ScanEvent, ScanOptions, Settings, SimilarGroup,
+    SpaceFreed, UndoInfo,
 };
 use declutter_core::platform::{KnownFolder, Platform};
 use declutter_core::sort::dto_path;
@@ -333,10 +333,11 @@ impl App {
         }))
     }
 
+    /// `removals`: the paths to remove, one list per group; the group is found in the shell's own last scan.
     pub fn trash_duplicates(
         &self,
         root: &str,
-        removals: &[DupRemoval],
+        removals: &[Vec<String>],
     ) -> Result<ActionResult, String> {
         let _one = lock(&self.acting);
         let ctx = self.ctx();
@@ -344,12 +345,7 @@ impl App {
         let (root, picked) = self.scanned(&ctx, root, |m| {
             let paths_of =
                 |g: &DupGroup| -> Vec<String> { g.files.iter().map(|f| f.path.clone()).collect() };
-            pick_groups(
-                &m.dups,
-                paths_of,
-                removals.iter().map(|r| &r.remove),
-                &mut errors,
-            )
+            pick_groups(&m.dups, paths_of, removals.iter(), &mut errors)
         })?;
         let pins = self.pins(&ctx);
         let mut batch = Vec::new();
@@ -420,7 +416,7 @@ impl App {
     pub fn trash_similar(
         &self,
         root: &str,
-        removals: &[SimilarRemoval],
+        removals: &[Vec<String>],
     ) -> Result<ActionResult, String> {
         let _one = lock(&self.acting);
         let ctx = self.ctx();
@@ -429,12 +425,7 @@ impl App {
             let paths_of = |g: &SimilarGroup| -> Vec<String> {
                 g.files.iter().map(|f| f.path.clone()).collect()
             };
-            pick_groups(
-                &m.similar,
-                paths_of,
-                removals.iter().map(|r| &r.remove),
-                &mut errors,
-            )
+            pick_groups(&m.similar, paths_of, removals.iter(), &mut errors)
         })?;
         let pins = self.pins(&ctx);
         let mut paths = Vec::new();

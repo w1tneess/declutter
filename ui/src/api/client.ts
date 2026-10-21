@@ -3,7 +3,6 @@
 import type { ActionResult } from './generated/ActionResult';
 import type { AppInfo } from './generated/AppInfo';
 import type { BinInfo } from './generated/BinInfo';
-import type { DupRemoval } from './generated/DupRemoval';
 import type { ExportPayload } from './generated/ExportPayload';
 import type { FolderCheck } from './generated/FolderCheck';
 import type { Move } from './generated/Move';
@@ -14,7 +13,6 @@ import type { ReminderStatus } from './generated/ReminderStatus';
 import type { ScanEvent } from './generated/ScanEvent';
 import type { ScanOptions } from './generated/ScanOptions';
 import type { Settings } from './generated/Settings';
-import type { SimilarRemoval } from './generated/SimilarRemoval';
 import type { SpaceFreed } from './generated/SpaceFreed';
 import type { UndoInfo } from './generated/UndoInfo';
 import { createMockApi } from './mock';
@@ -31,9 +29,10 @@ export interface Api {
   cancelScan(id: number): Promise<void>;
   applySort(root: string, moves: Move[], recentHours: number): Promise<ActionResult>;
   trashPaths(root: string, paths: string[]): Promise<ActionResult>;
-  trashDuplicates(root: string, removals: DupRemoval[]): Promise<ActionResult>;
+  /** `removals`: the paths to remove, one list per group. */
+  trashDuplicates(root: string, removals: string[][]): Promise<ActionResult>;
   trashRedownloads(root: string, pairs: Redownload[], removing: string[]): Promise<ActionResult>;
-  trashSimilar(root: string, removals: SimilarRemoval[]): Promise<ActionResult>;
+  trashSimilar(root: string, removals: string[][]): Promise<ActionResult>;
   trashEmptyDirs(root: string, paths: string[]): Promise<ActionResult>;
   peekUndo(): Promise<UndoInfo | null>;
   undoLastSort(): Promise<ActionResult>;

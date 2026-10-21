@@ -7,7 +7,7 @@ const g = (...paths: string[]) => ({ files: paths.map((path) => ({ path })) });
 describe('groupRemovals (SPEC rule 6)', () => {
   it('returns only groups with something to remove', () => {
     const groups = [g('a1', 'a2', 'a3'), g('b1', 'b2')];
-    expect(groupRemovals(groups, (p) => p === 'a2' || p === 'a3')).toEqual([{ group: groups[0], remove: ['a2', 'a3'] }]);
+    expect(groupRemovals(groups, (p) => p === 'a2' || p === 'a3')).toEqual([['a2', 'a3']]);
   });
 
   it('refuses a selection that removes every copy of a group', () => {

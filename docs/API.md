@@ -17,9 +17,9 @@ preview; the real one is selected when `window.__TAURI_INTERNALS__` exists.
 | `cancel_scan` | `id` | | partial results already sent stay valid; `Done{cancelled:true}` follows |
 | `apply_sort` | `root`, `moves: Move[]`, `recentHours` | `ActionResult` | writes the undo log |
 | `trash_paths` | `root`, `paths: string[]` | `ActionResult` | Large & Old, Leftovers |
-| `trash_duplicates` | `root`, `removals: DupRemoval[]` | `ActionResult` | |
+| `trash_duplicates` | `root`, `removals: string[][]` | `ActionResult` | paths to remove, one list per group; the group is looked up in the last scan and must keep a copy |
 | `trash_redownloads` | `root`, `pairs: Redownload[]`, `removing: string[]` | `ActionResult` | |
-| `trash_similar` | `root`, `removals: SimilarRemoval[]` | `ActionResult` | keeps at least one per group |
+| `trash_similar` | `root`, `removals: string[][]` | `ActionResult` | as `trash_duplicates`; keeps at least one per group |
 | `trash_empty_dirs` | `root`, `paths: string[]` | `ActionResult` | |
 | `peek_undo` | | `UndoInfo \| null` | |
 | `undo_last_sort` | | `ActionResult` | |

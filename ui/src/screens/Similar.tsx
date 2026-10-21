@@ -68,7 +68,7 @@ export function Similar() {
     } catch {
       return void alert('Keep one picture', 'Keep at least one picture in each group, then try again.');
     }
-    const n = removals.reduce((a, r) => a + r.remove.length, 0);
+    const n = removals.flat().length;
     await act({
       title: 'Send to Recycle Bin?',
       body: binWording(n),

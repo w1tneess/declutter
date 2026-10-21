@@ -184,16 +184,6 @@ dto! {
 }
 
 dto! {
-    /// The copies of one duplicate group the user chose to remove (the group is sent back so the shell can verify
-    /// a kept copy still exists right now).
-    pub struct DupRemoval { pub group: DupGroup, pub remove: Vec<String> }
-}
-
-dto! {
-    pub struct SimilarRemoval { pub group: SimilarGroup, pub remove: Vec<String> }
-}
-
-dto! {
     pub struct AppInfo { pub version: String }
 }
 

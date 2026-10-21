@@ -102,7 +102,7 @@ export function Duplicates() {
       return void alert('Keep one copy', (e as Error).message);
     }
     const pairs = (redl ?? []).filter((p) => going.has(p.copy.path));
-    const n = removals.reduce((a, r) => a + r.remove.length, 0) + pairs.length;
+    const n = removals.flat().length + pairs.length;
     if (!n) return;
     await act({
       title: 'Send to Recycle Bin?',
@@ -110,7 +110,7 @@ export function Duplicates() {
       confirmLabel: `Send ${plural(n, 'item')}`,
       run: async (root) => {
         const a = removals.length ? await api.trashDuplicates(root, removals) : { count: 0, errors: [] };
-        const b = pairs.length ? await api.trashRedownloads(root, pairs, removals.flatMap((r) => r.remove)) : { count: 0, errors: [] };
+        const b = pairs.length ? await api.trashRedownloads(root, pairs, removals.flat()) : { count: 0, errors: [] };
         return { count: a.count + b.count, errors: [...a.errors, ...b.errors] };
       },
       done: (k) => `Sent ${plural(k, 'item')} to the Recycle Bin. Restore them from the Bin if needed.`,

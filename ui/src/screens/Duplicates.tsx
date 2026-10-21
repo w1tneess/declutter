@@ -5,10 +5,10 @@ import type { FileRef } from '../api/generated/FileRef';
 import type { Redownload } from '../api/generated/Redownload';
 import { Badge, Button } from '../design/components';
 import { ResultList, ROW_H, type RowProps } from '../design/ResultList';
-import { baseName, dateText, humanSize, parentRel, plural, relPath } from '../format';
+import { baseName, dateText, humanSize, parentRel, relPath } from '../format';
 import { useSelectionVersion } from '../state/selection';
 import { groupRemovals } from '../state/rules';
-import { act, alert, binWording, exportCsv, reveal, unpinned, useApp } from '../state/store';
+import { alert, exportCsv, recycleSelected, reveal, unpinned, useApp } from '../state/store';
 import { FilterField, ListFooter, matches, ScreenHeader, showDetails, TabPlaceholder, useTabState } from './common';
 
 type Row =
@@ -102,18 +102,10 @@ export function Duplicates() {
       return void alert('Keep one copy', (e as Error).message);
     }
     const pairs = (redl ?? []).filter((p) => going.has(p.copy.path));
-    const n = removals.flat().length + pairs.length;
-    if (!n) return;
-    await act({
-      title: 'Send to Recycle Bin?',
-      body: binWording(n),
-      confirmLabel: `Send ${plural(n, 'item')}`,
-      run: async (root) => {
-        const a = removals.length ? await api.trashDuplicates(root, removals) : { count: 0, errors: [] };
-        const b = pairs.length ? await api.trashRedownloads(root, pairs, removals.flat()) : { count: 0, errors: [] };
-        return { count: a.count + b.count, errors: [...a.errors, ...b.errors] };
-      },
-      done: (k) => `Sent ${plural(k, 'item')} to the Recycle Bin. Restore them from the Bin if needed.`,
+    await recycleSelected(removals.flat().length + pairs.length, async (root) => {
+      const a = removals.length ? await api.trashDuplicates(root, removals) : { count: 0, errors: [] };
+      const b = pairs.length ? await api.trashRedownloads(root, pairs, removals.flat()) : { count: 0, errors: [] };
+      return { count: a.count + b.count, errors: [...a.errors, ...b.errors] };
     });
   };
 

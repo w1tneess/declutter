@@ -2,8 +2,8 @@ import { memo, useDeferredValue, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { Button, Icon } from '../design/components';
 import { ResultList, type RowProps } from '../design/ResultList';
-import { plural, relPath } from '../format';
-import { act, binWording, exportCsv, reveal, unpinned, useApp } from '../state/store';
+import { relPath } from '../format';
+import { exportCsv, recycleSelected, reveal, unpinned, useApp } from '../state/store';
 import { FilterField, ListFooter, matches, ScreenHeader, showDetails, TabPlaceholder, useTabState } from './common';
 
 const FolderRow = memo(function FolderRow({ row }: RowProps<string>) {
@@ -29,13 +29,7 @@ export function EmptyFolders() {
 
   const remove = () => {
     const paths = unpinned(sel.list());
-    void act({
-      title: 'Send to Recycle Bin?',
-      body: binWording(paths.length),
-      confirmLabel: `Send ${plural(paths.length, 'item')}`,
-      run: (root) => api.trashEmptyDirs(root, paths),
-      done: (k) => `Sent ${plural(k, 'item')} to the Recycle Bin. Restore them from the Bin if needed.`,
-    });
+    void recycleSelected(paths.length, (root) => api.trashEmptyDirs(root, paths));
   };
 
   return (

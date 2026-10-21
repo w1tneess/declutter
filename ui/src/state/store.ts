@@ -376,8 +376,20 @@ export function report(msg: string, errors: string[]) {
   void alert('Done, with some problems', `${msg}\n\n${plural(errors.length, 'item')} had problems:\n${shown.join('\n')}${errors.length > 8 ? `\n…and ${errors.length - 8} more.` : ''}`);
 }
 
-export const binWording = (n: number) =>
-  `Send ${plural(n, 'item')} to the Recycle Bin? They are not deleted. You can restore them from the Recycle Bin.`;
+/** Shown instead of a confirm when unpinning left nothing to act on. */
+export const ALL_PINNED = 'Nothing to do: everything selected is on your Never touch list.';
+
+/** The Recycle Bin confirm every removal tab uses. `n` counts what is left after pinned paths were dropped. */
+export function recycleSelected(n: number, run: (root: string) => Promise<ActionResult>) {
+  if (!n) return void toast(ALL_PINNED);
+  return act({
+    title: 'Send to Recycle Bin?',
+    body: `Send ${plural(n, 'item')} to the Recycle Bin? They are not deleted. You can restore them from the Recycle Bin.`,
+    confirmLabel: `Send ${plural(n, 'item')}`,
+    run,
+    done: (k) => `Sent ${plural(k, 'item')} to the Recycle Bin. Restore them from the Bin if needed.`,
+  });
+}
 
 /** Drops pinned paths right before acting: a pin added after the scan still protects its files. */
 export function unpinned(paths: string[]): string[] {

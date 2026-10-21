@@ -4,7 +4,7 @@ import type { Move } from '../api/generated/Move';
 import { Button, Icon, NumberField } from '../design/components';
 import { ResultList, type RowProps } from '../design/ResultList';
 import { ago, baseName, humanSize, plural } from '../format';
-import { act, alert, confirm, exportCsv, refreshUndo, report, reveal, startScan, unpinned, updateSettings, useApp } from '../state/store';
+import { act, alert, ALL_PINNED, confirm, exportCsv, refreshUndo, report, reveal, startScan, toast, unpinned, updateSettings, useApp } from '../state/store';
 import { FilterField, ListFooter, matches, ScreenHeader, showDetails, TabPlaceholder, useTabState } from './common';
 
 type Row = { head: true; cat: string; n: number; bytes: number } | { head?: false; m: Move };
@@ -63,6 +63,7 @@ export function Sort() {
     const keep = new Set(unpinned(sel.list()));
     const moves = (plan?.moves ?? []).filter((m) => keep.has(m.src));
     const n = moves.length;
+    if (!n) return void toast(ALL_PINNED);
     void act({
       title: 'Sort files?',
       body: `Move ${plural(n, 'file')} into type folders inside ${folder}? Nothing is deleted. You can undo this with "Undo last sort".`,

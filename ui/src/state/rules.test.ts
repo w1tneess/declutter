@@ -50,3 +50,17 @@ describe('unpinned', () => {
     expect(unpinned([p('C:/D/keep'), p('c:/d/KEEP/a.txt'), p('C:/D/Keeper.txt'), p('C:/D/x.txt')])).toEqual([p('C:/D/Keeper.txt'), p('C:/D/x.txt')]);
   });
 });
+
+describe('recycleSelected', () => {
+  it('asks nothing and runs nothing when pins left no items', async () => {
+    const { ALL_PINNED, recycleSelected, useApp } = await import('./store');
+    useApp.setState({ folder: 'C:/D', dialog: null, toasts: [] });
+    let ran = false;
+    await recycleSelected(0, async () => {
+      ran = true;
+      return { count: 0, errors: [] };
+    });
+    const s = useApp.getState();
+    expect([ran, s.dialog, s.toasts.map((t) => t.text)]).toEqual([false, null, [ALL_PINNED]]);
+  });
+});

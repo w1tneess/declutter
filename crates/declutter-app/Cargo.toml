@@ -1,0 +1,14 @@
+[package]
+name = "declutter-app"
+description = "Declutter app layer: scan pipeline, validated actions and the --remind mode, with no UI dependency"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+declutter-core = { path = "../declutter-core" }
+trash = "5"
+
+[dev-dependencies]
+tempfile = "3"

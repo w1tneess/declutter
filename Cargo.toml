@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/declutter-core"]
+members = ["crates/declutter-core", "crates/declutter-app", "src-tauri"]
 
 [workspace.package]
 version = "0.3.0"

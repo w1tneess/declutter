@@ -10,8 +10,8 @@ use regex::Regex;
 use crate::ctx::Ctx;
 use crate::model::{ActionResult, Move, SortPlan};
 use crate::paths::{
-    ext_lower, is_inside, last_touched, leave_alone, require_root, unique_path, DEAD_EXTS,
-    SKIP_SORT_EXTS,
+    ext_lower, is_inside, last_touched, leave_alone, require_root, through_link, unique_path,
+    DEAD_EXTS, SKIP_SORT_EXTS,
 };
 use crate::platform::{filetime_to_unix, move_no_replace};
 use crate::undo;
@@ -176,6 +176,13 @@ pub fn apply_moves(
         if let Some(b) = &base {
             if !(is_inside(src, b) && is_inside(dst, b)) {
                 errors.push(format!("{name}: outside the chosen folder, skipped"));
+                continue;
+            }
+            if [src, dst]
+                .iter()
+                .any(|p| p.parent().is_some_and(|d| through_link(d, b)))
+            {
+                errors.push(format!("{name}: inside a linked folder, skipped"));
                 continue;
             }
         }

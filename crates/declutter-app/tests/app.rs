@@ -592,7 +592,10 @@ fn similar_removals_keep_one_picture_per_group() {
         .unwrap();
     let all: Vec<String> = group.files.iter().map(|f| f.path.clone()).collect();
     let root = dto(&e.root);
-    let r = e.app.trash_similar(&root, &[all.clone()]).unwrap();
+    let r = e
+        .app
+        .trash_similar(&root, std::slice::from_ref(&all))
+        .unwrap();
     assert_eq!((r.count, r.errors.len()), (0, 1));
     assert!(r.errors[0].contains("keep at least one"));
     // The kept picture vanished since the scan: nothing goes.

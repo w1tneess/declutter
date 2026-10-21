@@ -208,6 +208,15 @@ pub fn is_inside(p: &Path, root: &Path) -> bool {
     })
 }
 
+/// True if an existing folder from `root` down to `dir` is a link, so a path that reads as inside `root` could lead
+/// outside it (e.g. a `Documents` junction on the Desktop). `is_symlink` covers symlinks and junctions, as in the
+/// walk; the bare reparse-point attribute is not used because OneDrive folders carry it too.
+pub fn through_link(dir: &Path, root: &Path) -> bool {
+    dir.ancestors()
+        .take_while(|a| is_inside(a, root))
+        .any(|a| std::fs::symlink_metadata(a).is_ok_and(|m| m.file_type().is_symlink()))
+}
+
 /// First free name: `a.txt`, `a (1).txt`, ... `taken` holds lower-cased paths planned in the same batch.
 pub fn unique_path(dst: &Path, taken: &HashSet<String>) -> PathBuf {
     // Anything already there counts, even a broken link, so a move can never land on it.
@@ -292,6 +301,33 @@ mod tests {
         assert!(has_protected_part(Path::new(r"C:\Users\x\AppData\Local")));
         assert!(has_protected_part(Path::new(r"D:\Program Files (x86)\x")));
         assert!(!has_protected_part(Path::new(r"D:\Projects\windows-notes")));
+    }
+
+    /// A directory junction (no privilege needed), else a symlink; false if the OS allows neither.
+    fn link_dir(link: &Path, target: &Path) -> bool {
+        std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(link)
+            .arg(target)
+            .output()
+            .is_ok_and(|o| o.status.success())
+            || std::os::windows::fs::symlink_dir(target, link).is_ok()
+    }
+
+    #[test]
+    fn links_between_the_root_and_a_folder_are_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let (root, outside) = (dir.path().join("root"), dir.path().join("outside"));
+        std::fs::create_dir_all(root.join("real")).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        assert!(!through_link(&root.join("real").join("new"), &root));
+        if !link_dir(&root.join("Docs"), &outside) {
+            eprintln!("skipped: this system refused to create a junction or a symlink");
+            return;
+        }
+        assert!(through_link(&root.join("Docs"), &root));
+        assert!(through_link(&root.join("Docs").join("sub"), &root));
+        assert!(!through_link(&root.join("real"), &root));
     }
 
     #[test]

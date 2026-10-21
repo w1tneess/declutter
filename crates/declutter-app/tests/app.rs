@@ -640,6 +640,42 @@ fn make_old(p: &Path) {
         .unwrap();
 }
 
+/// A directory junction (no privilege needed), else a symlink; false if the OS allows neither.
+fn link_dir(link: &Path, target: &Path) -> bool {
+    std::process::Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .output()
+        .is_ok_and(|o| o.status.success())
+        || std::os::windows::fs::symlink_dir(target, link).is_ok()
+}
+
+#[test]
+fn a_sort_never_moves_through_a_linked_folder() {
+    let e = env(FakeEngine::default());
+    make_old(&e.root.join("a.txt"));
+    run(&e, &e.root, options(false), false);
+    let outside = e.root.parent().unwrap().join("outside");
+    fs::create_dir(&outside).unwrap();
+    // The planned destination folder `Other` turns out to be a link to a folder outside the chosen one.
+    if !link_dir(&e.root.join("Other"), &outside) {
+        eprintln!("skipped: this system refused to create a junction or a symlink");
+        return;
+    }
+    let mv = Move {
+        src: dto(&e.root.join("a.txt")),
+        dst: dto(&e.root.join("Other").join("a.txt")),
+        size: 1,
+        category: "Other".into(),
+    };
+    let r = e.app.apply_sort(&dto(&e.root), &[mv], 0).unwrap();
+    assert_eq!((r.count, r.errors.len()), (0, 1), "{:?}", r.errors);
+    assert!(r.errors[0].contains("linked folder"));
+    assert!(e.root.join("a.txt").exists());
+    assert_eq!(fs::read_dir(&outside).unwrap().count(), 0);
+}
+
 #[test]
 fn removals_split_across_entries_still_keep_one_per_group() {
     let e = env(FakeEngine::default());

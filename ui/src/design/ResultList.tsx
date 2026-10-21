@@ -166,6 +166,9 @@ export function ResultList<R>(p: Props<R>) {
   };
 
   const Row = p.Row as ComponentType<RowProps<unknown>>;
+  const items = v.getVirtualItems();
+  // Only point at a row that is in the DOM; a row scrolled out of the window is not rendered.
+  const activeId = items.some((vi) => vi.index === cur) ? `${baseId}-${cur}` : undefined;
   return (
     <div
       ref={ref}
@@ -173,14 +176,14 @@ export function ResultList<R>(p: Props<R>) {
       role="listbox"
       aria-multiselectable="true"
       aria-label={p.label}
-      aria-activedescendant={cur >= 0 ? `${baseId}-${cur}` : undefined}
+      aria-activedescendant={activeId}
       tabIndex={0}
       onKeyDown={onKeyDown}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
     >
       <div className="rl-inner" style={{ height: v.getTotalSize() }}>
-        {v.getVirtualItems().map((vi) => {
+        {items.map((vi) => {
           const r = rows[vi.index] as R;
           const id = rowId(r);
           const header = isHeader?.(r) ?? false;

@@ -13,6 +13,7 @@ use serde_json::{json, Map, Value};
 
 use crate::ctx::Ctx;
 use crate::model::{Settings, SpaceFreed};
+use crate::platform::local_time_string;
 
 const SETTINGS_FILE: &str = "settings.json";
 const STATS_FILE: &str = "stats.json";
@@ -250,7 +251,7 @@ pub fn record_freed(ctx: &Ctx, bytes: u64, files: u64) -> Result<SpaceFreed, Str
     s.bytes = s.bytes.saturating_add(bytes);
     s.files = s.files.saturating_add(files);
     if s.since.is_none() {
-        s.since = Some(crate::export::local_time(ctx.now()));
+        s.since = local_time_string(ctx.now());
     }
     write_freed(ctx, &s)?;
     Ok(s)
@@ -485,7 +486,7 @@ mod tests {
         assert!(!t.path().join("data").join(STATS_FILE).exists());
         let s = record_freed(&c, 1000, 2).unwrap();
         let since = s.since.clone().expect("since is set on the first record");
-        assert_eq!(since, crate::export::local_time(NOW));
+        assert_eq!(Some(since.clone()), local_time_string(NOW));
         let s = record_freed(&c, u64::MAX, 1).unwrap();
         assert_eq!(
             (s.bytes, s.files, s.since.as_deref()),

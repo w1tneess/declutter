@@ -4,7 +4,9 @@
 
 use std::path::Path;
 
+use crate::fmt::human_size;
 use crate::model::{DupGroup, FileRef, Leftover, Move, Redownload, SimilarGroup};
+use crate::platform::local_time_string;
 
 /// `header` and every row have the same length `N`, so the writer can never reject a record.
 fn table<const N: usize>(header: [&str; N], rows: impl IntoIterator<Item = [String; N]>) -> String {
@@ -30,52 +32,13 @@ fn cell(s: &str) -> String {
     }
 }
 
-// shortcut: mirrors fmt::human_size (core-A), still a stub on this branch; call it once that lands.
 fn human(n: u64) -> String {
-    let mut v = n as f64;
-    for unit in ["B", "KB", "MB", "GB"] {
-        if v < 1024.0 {
-            return if unit == "B" {
-                format!("{v:.0} B")
-            } else {
-                format!("{v:.1} {unit}")
-            };
-        }
-        v /= 1024.0;
-    }
-    format!("{v:.1} TB")
+    human_size(n as f64)
 }
 
-/// Unix seconds as local "YYYY-MM-DD HH:MM:SS" (the undo log's format, which Excel reads as a date), with the
-/// daylight-saving rule of that date; empty when the time is unknown or out of range.
-pub(crate) fn local_time(secs: f64) -> String {
-    use windows::Win32::Foundation::{FILETIME, SYSTEMTIME};
-    use windows::Win32::System::Time::{FileTimeToSystemTime, SystemTimeToTzSpecificLocalTime};
-
-    // FILETIME counts 100 ns ticks since 1601-01-01 UTC.
-    let ticks = (secs + 11_644_473_600.0) * 1e7;
-    if !(0.0..9.0e18).contains(&ticks) {
-        return String::new(); // also catches NaN
-    }
-    let ticks = ticks as u64;
-    let ft = FILETIME {
-        dwLowDateTime: ticks as u32,
-        dwHighDateTime: (ticks >> 32) as u32,
-    };
-    let (mut utc, mut local) = (SYSTEMTIME::default(), SYSTEMTIME::default());
-    // SAFETY: both calls only read and write the three stack values passed by pointer, which outlive the calls;
-    // a null time-zone pointer means "the current zone".
-    let ok = unsafe {
-        FileTimeToSystemTime(&ft, &mut utc).is_ok()
-            && SystemTimeToTzSpecificLocalTime(None, &utc, &mut local).is_ok()
-    };
-    if !ok {
-        return String::new();
-    }
-    format!(
-        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-        local.wYear, local.wMonth, local.wDay, local.wHour, local.wMinute, local.wSecond
-    )
+/// Unix seconds as local "YYYY-MM-DD HH:MM:SS" (Excel reads it as a date); empty when the time is unknown.
+fn when(secs: f64) -> String {
+    local_time_string(secs).unwrap_or_default()
 }
 
 pub fn moves_csv(moves: &[Move]) -> String {
@@ -112,7 +75,7 @@ pub fn duplicates_csv(groups: &[DupGroup]) -> String {
                     keeper.into(),
                     f.size.to_string(),
                     human(f.size),
-                    local_time(f.mtime),
+                    when(f.mtime),
                 ]
             })
         }),
@@ -127,7 +90,7 @@ pub fn large_old_csv(files: &[FileRef]) -> String {
                 f.path.clone(),
                 f.size.to_string(),
                 human(f.size),
-                local_time(f.mtime),
+                when(f.mtime),
             ]
         }),
     )
@@ -142,7 +105,7 @@ pub fn leftovers_csv(items: &[Leftover]) -> String {
                 l.reason.clone(),
                 l.size.to_string(),
                 human(l.size),
-                local_time(l.mtime),
+                when(l.mtime),
             ]
         }),
     )
@@ -166,7 +129,7 @@ pub fn redownloads_csv(pairs: &[Redownload]) -> String {
                 c.size.to_string(),
                 human(c.size),
                 o.size.to_string(),
-                local_time(c.mtime),
+                when(c.mtime),
             ]
         }),
     )
@@ -194,7 +157,7 @@ pub fn similar_csv(groups: &[SimilarGroup]) -> String {
                     f.distance.to_string(),
                     f.size.to_string(),
                     human(f.size),
-                    local_time(f.mtime),
+                    when(f.mtime),
                 ]
             })
         }),
@@ -330,37 +293,6 @@ mod tests {
             lines(&empty_dirs_csv(&[r"C:\d\e".into()])),
             ["Folder", r"C:\d\e"]
         );
-    }
-
-    #[test]
-    fn human_matches_the_oracle() {
-        for (n, want) in [
-            (0, "0 B"),
-            (1023, "1023 B"),
-            (1024, "1.0 KB"),
-            (1_572_864, "1.5 MB"),
-            (5 << 40, "5.0 TB"),
-        ] {
-            assert_eq!(human(n), want);
-        }
-        assert_eq!(human(u64::MAX), "16777216.0 TB");
-    }
-
-    #[test]
-    fn local_time_shape_and_bounds() {
-        let t = local_time(1_700_000_000.0);
-        let b = t.as_bytes();
-        assert_eq!(t.len(), 19, "{t}");
-        assert_eq!(
-            (b[4], b[7], b[10], b[13], b[16]),
-            (b'-', b'-', b' ', b':', b':'),
-            "{t}"
-        );
-        assert!(t.starts_with("2023-11-1"), "{t}");
-        assert_ne!(local_time(1_700_003_600.0), t);
-        for bad in [f64::NAN, f64::INFINITY, -1e12, 1e15] {
-            assert_eq!(local_time(bad), "");
-        }
     }
 
     #[test]

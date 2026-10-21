@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - 'Cargo.*'
+      - 'crates/**/Cargo.toml'
       - 'deny.toml'
       - 'ui/package*.json'
       - '.github/workflows/audit.yml'
@@ -46,4 +47,4 @@ jobs:
       # Reads the lockfile only; nothing is installed or run.
       - if: hashFiles('ui/package-lock.json') != ''
         working-directory: ui
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high

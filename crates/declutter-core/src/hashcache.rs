@@ -13,6 +13,7 @@ use std::path::Path;
 
 use crate::ctx::Ctx;
 use crate::dupes::path_key;
+use crate::settings::write_atomic;
 
 const FILE: &str = "hashcache.bin";
 /// Format and version tag. Anything else (another version, a damaged or cut-off file) loads as an empty cache.
@@ -89,15 +90,7 @@ impl HashCache {
             }
             buf.extend_from_slice(&r.sha);
         }
-        let dir = ctx.platform.data_dir();
-        let tmp = dir.join(format!("{FILE}.{}.tmp", std::process::id()));
-        fs::create_dir_all(&dir)
-            .and_then(|()| fs::write(&tmp, &buf))
-            .and_then(|()| fs::rename(&tmp, dir.join(FILE)))
-            .map_err(|e| {
-                let _ = fs::remove_file(&tmp);
-                e.to_string()
-            })
+        write_atomic(&ctx.platform.data_dir().join(FILE), &buf).map_err(|e| e.to_string())
     }
 
     /// Everything while under `cap`; over it, entries whose file still exists, most recently used first. Existence

@@ -3,14 +3,14 @@
 
 export const KEEP_ONE = 'Keep at least one copy of every file. Pick which copy stays, then try again.';
 
-/** The paths to remove per group. Throws if any group would lose every file. */
-export function groupRemovals<G extends { files: { path: string }[] }>(groups: readonly G[], removing: (path: string) => boolean): { group: G; remove: string[] }[] {
-  const out: { group: G; remove: string[] }[] = [];
+/** The paths to remove, one list per group. Throws if any group would lose every file. */
+export function groupRemovals(groups: readonly { files: { path: string }[] }[], removing: (path: string) => boolean): string[][] {
+  const out: string[][] = [];
   for (const group of groups) {
     const remove = group.files.filter((f) => removing(f.path)).map((f) => f.path);
     if (!remove.length) continue;
     if (remove.length >= group.files.length) throw new Error(KEEP_ONE);
-    out.push({ group, remove });
+    out.push(remove);
   }
   return out;
 }

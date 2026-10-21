@@ -9,8 +9,8 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use declutter_app::{App, Engine};
 use declutter_core::model::{
-    Breakdown, DupGroup, DupRemoval, FileRef, Leftover, Move, Phase, Progress, Redownload,
-    ScanEvent, ScanOptions, Settings, SimilarFile, SimilarGroup, SimilarRemoval, SortPlan,
+    Breakdown, DupGroup, FileRef, Leftover, Move, Phase, Progress, Redownload, ScanEvent,
+    ScanOptions, Settings, SimilarFile, SimilarGroup, SortPlan,
 };
 use declutter_core::platform::{DriveKind, KnownFolder, Platform};
 use declutter_core::walk::{Entry, Scan};
@@ -120,7 +120,6 @@ impl Engine for FakeEngine {
             remember_last_folder: true,
             pins: self.pins.lock().unwrap().clone(),
             active_preset: None,
-            reminder_enabled: false,
         }
     }
     fn walk(&self, ctx: &Ctx, root: &Path, _: &[PathBuf]) -> Scan {
@@ -557,25 +556,15 @@ fn duplicate_and_redownload_removals_must_match_the_scan() {
     let e = env(FakeEngine::default());
     run(&e, &e.root, options(false), false);
     let root = dto(&e.root);
-    // A group the UI made up (a keeper outside the folder) names a path no stored group holds.
+    // A path no stored group holds.
     let fake = FileRef {
         path: dto(&e.root.join("a.txt")),
         size: 1,
         mtime: 0.0,
     };
-    let group = DupGroup {
-        size: 1,
-        files: vec![fake.clone()],
-    };
     let r = e
         .app
-        .trash_duplicates(
-            &root,
-            &[DupRemoval {
-                group,
-                remove: vec![fake.path.clone()],
-            }],
-        )
+        .trash_duplicates(&root, &[vec![fake.path.clone()]])
         .unwrap();
     assert_eq!((r.count, r.errors.len()), (0, 1));
     let pair = Redownload {
@@ -605,28 +594,13 @@ fn similar_removals_keep_one_picture_per_group() {
     let root = dto(&e.root);
     let r = e
         .app
-        .trash_similar(
-            &root,
-            &[SimilarRemoval {
-                group: group.clone(),
-                remove: all.clone(),
-            }],
-        )
+        .trash_similar(&root, std::slice::from_ref(&all))
         .unwrap();
     assert_eq!((r.count, r.errors.len()), (0, 1));
     assert!(r.errors[0].contains("keep at least one"));
     // The kept picture vanished since the scan: nothing goes.
     fs::remove_file(&all[0]).unwrap();
-    let r = e
-        .app
-        .trash_similar(
-            &root,
-            &[SimilarRemoval {
-                group,
-                remove: vec![all[1].clone()],
-            }],
-        )
-        .unwrap();
+    let r = e.app.trash_similar(&root, &[vec![all[1].clone()]]).unwrap();
     assert_eq!((r.count, r.errors.len()), (0, 1));
     assert!(r.errors[0].contains("no longer there"));
     nothing_recycled(&e);
@@ -705,39 +679,19 @@ fn removals_split_across_entries_still_keep_one_per_group() {
     for name in ["dup1.bin", "dup2.bin", "pic1.png", "pic2.png"] {
         make_old(&e.root.join(name));
     }
-    let events = run(&e, &e.root, options(true), false);
+    run(&e, &e.root, options(true), false);
     let root = dto(&e.root);
     let one = |p: &str| vec![dto(&e.root.join(p))];
-    let dups = events
-        .iter()
-        .find_map(|ev| match ev {
-            ScanEvent::Duplicates { groups } => groups.first().cloned(),
-            _ => None,
-        })
+    let r = e
+        .app
+        .trash_duplicates(&root, &[one("dup1.bin"), one("dup2.bin")])
         .unwrap();
-    let removals: Vec<DupRemoval> = ["dup1.bin", "dup2.bin"]
-        .map(|p| DupRemoval {
-            group: dups.clone(),
-            remove: one(p),
-        })
-        .into();
-    let r = e.app.trash_duplicates(&root, &removals).unwrap();
     assert_eq!((r.count, r.errors.len()), (0, 1), "{:?}", r.errors);
     assert!(r.errors[0].contains("Keep at least one"));
-    let similar = events
-        .iter()
-        .find_map(|ev| match ev {
-            ScanEvent::Similar { groups } => groups.first().cloned(),
-            _ => None,
-        })
+    let r = e
+        .app
+        .trash_similar(&root, &[one("pic1.png"), one("pic2.png")])
         .unwrap();
-    let removals: Vec<SimilarRemoval> = ["pic1.png", "pic2.png"]
-        .map(|p| SimilarRemoval {
-            group: similar.clone(),
-            remove: one(p),
-        })
-        .into();
-    let r = e.app.trash_similar(&root, &removals).unwrap();
     assert_eq!((r.count, r.errors.len()), (0, 1), "{:?}", r.errors);
     assert!(r.errors[0].contains("keep at least one"));
     nothing_recycled(&e);

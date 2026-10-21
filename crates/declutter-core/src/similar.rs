@@ -6,7 +6,7 @@
 //!
 //! Hash: `image_hasher`'s Gradient algorithm (dHash) on an 8x8 grid, 64 bits. It survives resizing, recompression
 //! and brightness changes, and is the cheapest of the robust options (DCT/pHash costs 50-100 % more per image).
-//! Grouping: union-find over pairs within `max_distance`, so a chain A~B~C forms one group and `distance` (always
+//! Grouping: union-find over pairs within `MAX_DISTANCE`, so a chain A~B~C forms one group and `distance` (always
 //! relative to the group's first file) can exceed the threshold for the far end of a chain.
 
 use std::collections::HashMap;
@@ -26,9 +26,7 @@ use crate::walk::Entry;
 
 /// 6 of 64 bits: in dHash practice 0-5 is "same picture, resized or recompressed", 6-10 starts catching merely
 /// alike shots (burst photos), above that unrelated pictures.
-pub const DEFAULT_MAX_DISTANCE: u32 = 6;
-/// Beyond this a 64-bit dHash no longer says "similar", and the bucket index below degrades towards all pairs.
-const MAX_DISTANCE_CAP: u32 = 16;
+const MAX_DISTANCE: u32 = 6;
 const EXTS: [&str; 9] = [
     "jpg", "jpeg", "png", "gif", "bmp", "webp", "tif", "tiff", "ico",
 ];
@@ -86,14 +84,13 @@ fn find(parent: &mut [usize], mut x: usize) -> usize {
     x
 }
 
-/// Component root for each of `hashes` (distinct values) when hashes within `max_distance` are linked, plus the
+/// Component root for each of `hashes` (distinct values) when hashes within `d` bits are linked, plus the
 /// number of distance checks made.
 ///
 /// Not all pairs: by pigeonhole, two hashes differing in at most d bits agree exactly on at least one of d + 1
 /// disjoint bit blocks, so only hashes sharing a block value are compared. For d = 6 the blocks are 9-10 bits wide,
 /// so n spread-out hashes cost about 7 n^2 / 1024 checks instead of n^2 / 2.
-fn components(hashes: &[u64], max_distance: u32) -> (Vec<usize>, u64) {
-    let d = max_distance.min(MAX_DISTANCE_CAP);
+fn components(hashes: &[u64], d: u32) -> (Vec<usize>, u64) {
     let blocks = d + 1;
     let mut parent: Vec<usize> = (0..hashes.len()).collect();
     let mut checks = 0u64;
@@ -134,9 +131,8 @@ fn progress(done: u64, total: u64, bytes: u64, start: Instant) -> Progress {
     }
 }
 
-/// `max_distance`: Hamming distance threshold (default 6 of 64 bits is a sensible start; document the choice).
-/// A cancel keeps the groups found among the pictures hashed so far; each of them is still a real match.
-pub fn find_similar(ctx: &Ctx, entries: &[Entry], max_distance: u32) -> Vec<SimilarGroup> {
+/// Groups pictures within `MAX_DISTANCE` bits of each other. A cancel keeps the groups found among the pictures hashed so far; each of them is still a real match.
+pub fn find_similar(ctx: &Ctx, entries: &[Entry]) -> Vec<SimilarGroup> {
     let todo: Vec<&Entry> = entries
         .iter()
         .filter(|e| e.size > 0 && e.size <= MAX_FILE_BYTES && is_image(&e.path))
@@ -182,7 +178,7 @@ pub fn find_similar(ctx: &Ctx, entries: &[Entry], max_distance: u32) -> Vec<Simi
     let mut uniq: Vec<u64> = hashed.iter().map(|h| h.hash).collect();
     uniq.sort_unstable();
     uniq.dedup();
-    let (roots, _) = components(&uniq, max_distance);
+    let (roots, _) = components(&uniq, MAX_DISTANCE);
     let mut by_root: HashMap<usize, Vec<&Hashed>> = HashMap::new();
     for h in &hashed {
         if let Ok(i) = uniq.binary_search(&h.hash) {
@@ -294,7 +290,7 @@ mod tests {
     fn groups_near_copies_and_skips_the_rest() {
         let t = tempfile::tempdir().unwrap();
         let entries = fixture(t.path());
-        let groups = find_similar(&ctx(t.path()), &entries, DEFAULT_MAX_DISTANCE);
+        let groups = find_similar(&ctx(t.path()), &entries);
         assert_eq!(groups.len(), 1, "{groups:?}");
         let files = &groups[0].files;
         let mut names: Vec<String> = files.iter().map(name).collect();
@@ -310,7 +306,7 @@ mod tests {
         let small = files.iter().find(|f| name(f) == "c_small.bmp").unwrap();
         assert_eq!((small.width, small.height), (150, 100));
         assert!(
-            files.iter().all(|f| f.distance <= DEFAULT_MAX_DISTANCE),
+            files.iter().all(|f| f.distance <= MAX_DISTANCE),
             "{files:?}"
         );
         let copy = files.iter().find(|f| name(f) == "d_copy.PNG").unwrap();
@@ -328,7 +324,7 @@ mod tests {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let sink = Arc::clone(&seen);
         let c = ctx(t.path()).with_progress(move |p| sink.lock().unwrap().push(p));
-        find_similar(&c, &entries, DEFAULT_MAX_DISTANCE);
+        find_similar(&c, &entries);
         let seen = seen.lock().unwrap();
         let last = seen.last().expect("a final report");
         assert_eq!(
@@ -341,14 +337,14 @@ mod tests {
 
         let c = ctx(t.path());
         c.cancel();
-        assert!(find_similar(&c, &entries, DEFAULT_MAX_DISTANCE).is_empty());
+        assert!(find_similar(&c, &entries).is_empty());
     }
 
     #[test]
     fn nothing_to_compare_is_fine() {
         let t = tempfile::tempdir().unwrap();
-        assert!(find_similar(&ctx(t.path()), &[], 6).is_empty());
-        assert!(find_similar(&ctx(t.path()), &[entry_missing()], 6).is_empty());
+        assert!(find_similar(&ctx(t.path()), &[]).is_empty());
+        assert!(find_similar(&ctx(t.path()), &[entry_missing()]).is_empty());
     }
 
     fn entry_missing() -> Entry {
@@ -420,7 +416,7 @@ mod tests {
         let mut seed = 42;
         let n = 20_000u64;
         let hashes: Vec<u64> = (0..n).map(|_| rng(&mut seed)).collect();
-        let (_, checks) = components(&hashes, DEFAULT_MAX_DISTANCE);
+        let (_, checks) = components(&hashes, MAX_DISTANCE);
         // All pairs would be n^2 / 2 = 2e8; the block index needs about 7 n^2 / 1024 = 2.7e6.
         assert!(checks < n * n / 50, "{checks} checks");
     }

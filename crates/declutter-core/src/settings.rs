@@ -13,6 +13,7 @@ use serde_json::{json, Map, Value};
 
 use crate::ctx::Ctx;
 use crate::model::{Settings, SpaceFreed};
+use crate::platform::local_time_string;
 
 const SETTINGS_FILE: &str = "settings.json";
 const STATS_FILE: &str = "stats.json";
@@ -112,10 +113,6 @@ fn parse(obj: &Map<String, Value>) -> Settings {
         remember_last_folder: obj.get("reopen").and_then(Value::as_bool).unwrap_or(false),
         pins,
         active_preset: text(obj.get("active_preset")),
-        reminder_enabled: obj
-            .get("reminder_enabled")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
     })
 }
 
@@ -174,7 +171,6 @@ fn store(ctx: &Ctx, settings: &Settings) -> Result<Settings, String> {
         ("reopen", json!(s.remember_last_folder)),
         ("pins", json!(s.pins)),
         ("active_preset", json!(s.active_preset)),
-        ("reminder_enabled", json!(s.reminder_enabled)),
     ] {
         obj.insert(k.to_owned(), v);
     }
@@ -250,7 +246,7 @@ pub fn record_freed(ctx: &Ctx, bytes: u64, files: u64) -> Result<SpaceFreed, Str
     s.bytes = s.bytes.saturating_add(bytes);
     s.files = s.files.saturating_add(files);
     if s.since.is_none() {
-        s.since = Some(crate::export::local_time(ctx.now()));
+        s.since = local_time_string(ctx.now());
     }
     write_freed(ctx, &s)?;
     Ok(s)
@@ -404,7 +400,7 @@ mod tests {
             t.path(),
             "data",
             SETTINGS_FILE,
-            r#"{"future_key": {"a": 1}, "theme": "Light"}"#,
+            r#"{"future_key": {"a": 1}, "theme": "Light", "reminder_enabled": true}"#,
         );
         let mut s = load_settings(&c);
         assert_eq!(s.theme, "light");
@@ -412,7 +408,6 @@ mod tests {
         s.min_mb = f64::NAN;
         s.older_days = 40;
         s.active_preset = Some("work".into());
-        s.reminder_enabled = true;
         s.pins = vec!["C:\\A".into(), "c:\\a\\".into(), "nope".into()];
         save_settings(&c, &s).unwrap();
         let back = load_settings(&c);
@@ -422,9 +417,13 @@ mod tests {
         );
         assert_eq!(back.pins, vec!["C:\\A"]);
         assert_eq!(back.active_preset.as_deref(), Some("work"));
-        assert!(back.reminder_enabled);
         let v = raw(t.path());
         assert_eq!(v["future_key"], json!({"a": 1}));
+        assert_eq!(
+            v["reminder_enabled"],
+            json!(true),
+            "a key older builds wrote is kept"
+        );
         assert_eq!(
             v["theme"],
             json!("Light"),
@@ -485,7 +484,7 @@ mod tests {
         assert!(!t.path().join("data").join(STATS_FILE).exists());
         let s = record_freed(&c, 1000, 2).unwrap();
         let since = s.since.clone().expect("since is set on the first record");
-        assert_eq!(since, crate::export::local_time(NOW));
+        assert_eq!(Some(since.clone()), local_time_string(NOW));
         let s = record_freed(&c, u64::MAX, 1).unwrap();
         assert_eq!(
             (s.bytes, s.files, s.since.as_deref()),

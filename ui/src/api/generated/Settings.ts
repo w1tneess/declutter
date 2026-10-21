@@ -7,4 +7,4 @@ export type Settings = {
 /**
  * "system" | "light" | "dark"
  */
-theme: string, recentHours: number, minMb: number, olderDays: number, lastFolder: string | null, rememberLastFolder: boolean, pins: Array<string>, activePreset: string | null, reminderEnabled: boolean, };
+theme: string, recentHours: number, minMb: number, olderDays: number, lastFolder: string | null, rememberLastFolder: boolean, pins: Array<string>, activePreset: string | null, };

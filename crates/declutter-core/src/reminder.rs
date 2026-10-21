@@ -11,21 +11,19 @@ use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Output};
 
-use crate::ctx::Ctx;
 use crate::model::ReminderStatus;
 
 pub const TASK_NAME: &str = "Declutter reminder";
-const DEFAULT_SCHEDULE: &str = "weekly";
 /// `schtasks` refuses a `/TR` longer than this.
 const TR_MAX: usize = 261;
 /// Keeps a console window from flashing up when the GUI runs `schtasks`.
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-/// Arguments for `schtasks /Create ...` (weekly by default). Pure, for tests.
+/// Arguments for `schtasks /Create ...`. Pure, for tests.
 ///
-/// Runs as the signed-in user with limited rights (no `/RU`, `/RL LIMITED`), only while they are logged on, at
-/// 09:00. `/F` makes enabling twice simply replace the task.
-pub fn create_args(exe: &Path, schedule: &str) -> Result<Vec<String>, String> {
+/// Runs as the signed-in user with limited rights (no `/RU`, `/RL LIMITED`), only while they are logged on, on
+/// Mondays at 09:00. `/F` makes enabling twice simply replace the task.
+pub fn create_args(exe: &Path) -> Result<Vec<String>, String> {
     let exe_text = exe.to_str().unwrap_or_default();
     // The path goes inside "..." in /TR: a quote would end it early, % would expand as a variable.
     let plain = !exe_text.contains(['"', '%']) && !exe_text.chars().any(char::is_control);
@@ -39,18 +37,12 @@ pub fn create_args(exe: &Path, schedule: &str) -> Result<Vec<String>, String> {
                 .into(),
         );
     }
-    let when: &[&str] = match schedule.trim().to_lowercase().as_str() {
-        "" | "weekly" => &["/SC", "WEEKLY", "/D", "MON"],
-        "daily" => &["/SC", "DAILY"],
-        "monthly" => &["/SC", "MONTHLY", "/D", "1"],
-        _ => return Err("Choose a daily, weekly or monthly reminder.".into()),
-    };
-    let mut args: Vec<String> = ["/Create", "/TN", TASK_NAME, "/TR", tr.as_str()]
-        .map(String::from)
-        .to_vec();
-    args.extend(when.iter().map(|s| (*s).to_owned()));
-    args.extend(["/ST", "09:00", "/RL", "LIMITED", "/F"].map(String::from));
-    Ok(args)
+    Ok([
+        "/Create", "/TN", TASK_NAME, "/TR", &*tr, "/SC", "WEEKLY", "/D", "MON", "/ST", "09:00",
+        "/RL", "LIMITED", "/F",
+    ]
+    .map(String::from)
+    .to_vec())
 }
 
 /// Fixed program, argument list passed as-is (no shell), so nothing in it is ever interpreted.
@@ -84,17 +76,6 @@ fn query(args: &[&str]) -> Option<String> {
     out.status.success().then(|| decode(&out.stdout))
 }
 
-fn schedule_of(xml: &str) -> Option<&'static str> {
-    [
-        ("<ScheduleByDay>", "daily"),
-        ("<ScheduleByWeek>", "weekly"),
-        ("<ScheduleByMonth>", "monthly"),
-    ]
-    .into_iter()
-    .find(|(tag, _)| xml.contains(tag))
-    .map(|(_, s)| s)
-}
-
 /// Second column of `schtasks /Query /FO CSV /NH`, shown as Windows formats it; None when it holds no date
 /// (a disabled task says "N/A" in the user's language).
 fn next_run(csv_text: &str) -> Option<String> {
@@ -115,13 +96,12 @@ fn next_run(csv_text: &str) -> Option<String> {
 fn off() -> ReminderStatus {
     ReminderStatus {
         enabled: false,
-        schedule: DEFAULT_SCHEDULE.into(),
         next_run: None,
     }
 }
 
-pub fn enable(ctx: &Ctx, exe: &Path, schedule: &str) -> Result<ReminderStatus, String> {
-    let args = create_args(exe, schedule)?;
+pub fn enable(exe: &Path) -> Result<ReminderStatus, String> {
+    let args = create_args(exe)?;
     let out =
         schtasks(args.as_slice()).map_err(|e| format!("Could not turn on the reminder: {e}"))?;
     if !out.status.success() {
@@ -130,11 +110,11 @@ pub fn enable(ctx: &Ctx, exe: &Path, schedule: &str) -> Result<ReminderStatus, S
             decode(&out.stderr).trim()
         ));
     }
-    Ok(status(ctx))
+    Ok(status())
 }
 
 /// Deleting a task that is not there fails, which is the state asked for, so the result is judged by a fresh query.
-pub fn disable(ctx: &Ctx) -> Result<ReminderStatus, String> {
+pub fn disable() -> Result<ReminderStatus, String> {
     let deleted = schtasks(&["/Delete", "/TN", TASK_NAME, "/F"]);
     if query(&["/Query", "/TN", TASK_NAME]).is_some() {
         let why = match deleted {
@@ -143,18 +123,17 @@ pub fn disable(ctx: &Ctx) -> Result<ReminderStatus, String> {
         };
         return Err(format!("Could not turn off the reminder: {why}"));
     }
-    Ok(status(ctx))
+    Ok(status())
 }
 
-/// `ctx` is unused today: the task itself is the source of truth, not a setting.
-pub fn status(_ctx: &Ctx) -> ReminderStatus {
+/// The scheduled task itself is the source of truth, not a setting.
+pub fn status() -> ReminderStatus {
     let Some(xml) = query(&["/Query", "/TN", TASK_NAME, "/XML"]) else {
         return off();
     };
     ReminderStatus {
         // A task switched off in Task Scheduler still exists but will not run.
         enabled: !xml.contains("<Enabled>false</Enabled>"),
-        schedule: schedule_of(&xml).unwrap_or(DEFAULT_SCHEDULE).into(),
         next_run: query(&["/Query", "/TN", TASK_NAME, "/FO", "CSV", "/NH"])
             .and_then(|t| next_run(&t)),
     }
@@ -178,7 +157,7 @@ mod tests {
     const EXE: &str = r"C:\Program Files\Declutter\declutter.exe";
 
     #[test]
-    fn weekly_monday_nine_by_default() {
+    fn weekly_monday_nine() {
         let want = [
             "/Create",
             "/TN",
@@ -195,18 +174,7 @@ mod tests {
             "LIMITED",
             "/F",
         ];
-        assert_eq!(create_args(Path::new(EXE), "").unwrap(), want);
-        assert_eq!(create_args(Path::new(EXE), " Weekly ").unwrap(), want);
-    }
-
-    #[test]
-    fn other_schedules() {
-        let daily = create_args(Path::new(EXE), "daily").unwrap();
-        assert_eq!(&daily[5..8], ["/SC", "DAILY", "/ST"]);
-        let monthly = create_args(Path::new(EXE), "MONTHLY").unwrap();
-        assert_eq!(&monthly[5..10], ["/SC", "MONTHLY", "/D", "1", "/ST"]);
-        assert!(create_args(Path::new(EXE), "hourly").is_err());
-        assert!(create_args(Path::new(EXE), "weekly /RU SYSTEM").is_err());
+        assert_eq!(create_args(Path::new(EXE)).unwrap(), want);
     }
 
     #[test]
@@ -222,13 +190,13 @@ mod tests {
             r"C:\Declutter\declutter",
             "",
         ] {
-            assert!(create_args(Path::new(bad), "weekly").is_err(), "{bad:?}");
+            assert!(create_args(Path::new(bad)).is_err(), "{bad:?}");
         }
         let long = format!(r"C:\{}\declutter.exe", "a".repeat(240));
-        assert!(create_args(Path::new(&long), "weekly").is_err());
+        assert!(create_args(Path::new(&long)).is_err());
         let fits = format!(r"C:\{}\declutter.exe", "a".repeat(230));
-        assert!(create_args(Path::new(&fits), "weekly").is_ok());
-        assert!(create_args(Path::new(r"C:\Users\Zoë\Apps\Declutter.EXE"), "weekly").is_ok());
+        assert!(create_args(Path::new(&fits)).is_ok());
+        assert!(create_args(Path::new(r"C:\Users\Zoë\Apps\Declutter.EXE")).is_ok());
     }
 
     #[test]
@@ -242,30 +210,6 @@ mod tests {
         assert_eq!(decode(text.as_bytes()), text);
         assert_eq!(decode(b""), "");
         assert_eq!(decode(&[0xFF]), "\u{fffd}");
-    }
-
-    #[test]
-    fn reads_schedule_from_task_xml() {
-        let xml = |trigger: &str| {
-            format!("<Task><Triggers><CalendarTrigger>{trigger}</CalendarTrigger></Triggers><Settings><Enabled>true</Enabled></Settings></Task>")
-        };
-        assert_eq!(
-            schedule_of(&xml(
-                "<ScheduleByWeek><WeeksInterval>1</WeeksInterval></ScheduleByWeek>"
-            )),
-            Some("weekly")
-        );
-        assert_eq!(
-            schedule_of(&xml(
-                "<ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>"
-            )),
-            Some("daily")
-        );
-        assert_eq!(
-            schedule_of(&xml("<ScheduleByMonth><Months/></ScheduleByMonth>")),
-            Some("monthly")
-        );
-        assert_eq!(schedule_of(&xml("<TimeTrigger/>")), None);
     }
 
     #[test]

@@ -40,7 +40,7 @@ export function createTauriApi(): Api {
     openRecycleBin: () => invoke('open_recycle_bin'),
     revealInExplorer: (path) => invoke('reveal_in_explorer', { path }),
     reminderStatus: () => invoke('reminder_status'),
-    reminderEnable: (schedule) => invoke('reminder_enable', { schedule }),
+    reminderEnable: () => invoke('reminder_enable'),
     reminderDisable: () => invoke('reminder_disable'),
     onFolderDrop: (cb) => {
       const off = getCurrentWebview().onDragDropEvent((e) => {

@@ -5,54 +5,15 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::model::{Breakdown, SizeEntry};
+use crate::paths::ext_lower;
+use crate::sort::CATEGORIES;
 use crate::walk::Entry;
 
-// shortcut: mirrors CATEGORIES in core.py because sort.rs (core-A) has no public table yet; share one at integration.
-pub(crate) const CATEGORIES: [(&str, &[&str]); 7] = [
-    (
-        "Images",
-        &[
-            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".heic", ".tiff", ".ico",
-        ],
-    ),
-    (
-        "Documents",
-        &[
-            ".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt", ".md", ".ppt", ".pptx", ".xls",
-            ".xlsx", ".csv",
-        ],
-    ),
-    (
-        "Videos",
-        &[".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"],
-    ),
-    ("Audio", &[".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a"]),
-    ("Archives", &[".zip", ".rar", ".7z", ".tar", ".gz", ".bz2"]),
-    (
-        "Installers",
-        &[".exe", ".msi", ".msix", ".apk", ".dmg", ".iso"],
-    ),
-    (
-        "Code",
-        &[
-            ".py", ".js", ".ts", ".html", ".css", ".json", ".java", ".c", ".cpp", ".cs", ".ipynb",
-            ".sql",
-        ],
-    ),
-];
-
-/// Lower-cased extension with the dot, as the category tables spell it.
-pub(crate) fn dot_ext(path: &Path) -> Option<String> {
-    Some(format!(".{}", path.extension()?.to_str()?.to_lowercase()))
-}
-
 fn category(path: &Path) -> &'static str {
-    dot_ext(path)
-        .and_then(|ext| {
-            CATEGORIES
-                .iter()
-                .find(|(_, exts)| exts.contains(&ext.as_str()))
-        })
+    let ext = ext_lower(path);
+    CATEGORIES
+        .iter()
+        .find(|(_, exts)| exts.contains(&ext.as_str()))
         .map_or("Other", |(cat, _)| cat)
 }
 
@@ -185,7 +146,7 @@ mod tests {
     fn category_tables_do_not_overlap() {
         let mut seen = std::collections::HashSet::new();
         for (_, exts) in CATEGORIES {
-            for ext in exts {
+            for ext in exts.iter() {
                 assert!(
                     ext.starts_with('.') && *ext == ext.to_lowercase() && seen.insert(ext),
                     "{ext}"

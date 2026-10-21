@@ -64,13 +64,13 @@ fn result(env: &Env, r: &ActionResult) -> Value {
 }
 
 fn plan(env: &Env, recent_hours: u32) -> SortPlan {
-    let scan = walk::scan_entries(&env.ctx, &env.root, &[]).unwrap();
+    let scan = walk::walk_files(&env.ctx, &env.root, &[]);
     sort::plan_sort(&env.ctx, &env.root, &scan.entries, recent_hours).unwrap()
 }
 
 fn scan(env: &Env, p: &Value) -> Value {
     let ignore: Vec<PathBuf> = strs(&p["ignore"]).map(|x| env.path(x)).collect();
-    let scan = walk::scan_entries(&env.ctx, &env.root, &ignore).unwrap();
+    let scan = walk::walk_files(&env.ctx, &env.root, &ignore);
     let mut files: Vec<String> = scan.entries.iter().map(|e| env.rel(&e.path)).collect();
     let mut skipped: Vec<String> = scan.skipped.iter().map(|s| env.rel(s)).collect();
     files.sort();
@@ -197,10 +197,26 @@ fn undo_op(env: &Env, p: &Value) -> Value {
     for a in p["after_apply"].as_array().into_iter().flatten() {
         env.act(a);
     }
-    out.insert("can_undo".into(), undo::can_undo(ctx).into());
-    out.insert("undo_count".into(), undo::undo_count(ctx).into());
+    // The oracle's can_undo / undo_count: a non-empty log, and the moves in its newest batch.
+    let log = undo_log(env);
+    let count = log.last().map_or(0, |b| b["moves"].as_array().map_or(0, Vec::len));
+    out.insert("can_undo".into(), (!log.is_empty()).into());
+    out.insert("undo_count".into(), count.into());
     out.insert("undo".into(), result(env, &undo::undo_last(ctx)));
     out.insert("tree_after_undo".into(), env.snapshot());
     out.insert("log_len_after_undo".into(), undo_log(env).len().into());
     Value::Object(out)
+}
+
+/// Not an oracle fixture (v0.2.2 had no presets): undoing a two-level preset sort removes both emptied folders.
+#[test]
+fn undo_removes_an_emptied_two_level_preset_folder() {
+    let env = Env::new(&json!({ "tree": { "files": [{ "path": "a.txt" }] } }));
+    let scan = walk::walk_files(&env.ctx, &env.root, &[]);
+    let work = |_: &walk::Entry| Some(vec!["Work".to_string(), "2024".to_string()]);
+    let plan = sort::plan_sort_with(&env.ctx, &env.root, &scan.entries, 0, &work).unwrap();
+    assert_eq!(sort::apply_moves(&env.ctx, &plan.moves, Some(&env.root), 0).count, 1);
+    assert_eq!(env.snapshot(), json!({ "files": ["Work/2024/a.txt"], "dirs": ["Work", "Work/2024"] }));
+    assert_eq!(undo::undo_last(&env.ctx).count, 1);
+    assert_eq!(env.snapshot(), json!({ "files": ["a.txt"], "dirs": [] }));
 }

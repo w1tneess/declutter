@@ -161,18 +161,19 @@ pub fn is_app_folder(lower_names: &HashSet<String>) -> bool {
         && lower_names.iter().any(|n| n.ends_with(".dll"))
 }
 
-/// Lower-cased extension with its dot, as Python's `os.path.splitext` sees it: `"a.TXT"` -> `".txt"`,
-/// `".bashrc"` -> `""`.
-pub fn ext_lower(name: &str) -> String {
-    let trimmed = name.trim_start_matches('.');
-    trimmed
-        .rfind('.')
-        .map_or_else(String::new, |i| trimmed[i..].to_lowercase())
+/// Lower-cased extension with its dot, as Python's `Path.suffix.lower()` gives it: `"a.TXT"` -> `".txt"`,
+/// `".bashrc"` and `"noext"` -> `""`.
+pub fn ext_lower(p: &Path) -> String {
+    p.extension()
+        .filter(|e| !e.is_empty())
+        .map_or_else(String::new, |e| {
+            format!(".{}", e.to_string_lossy().to_lowercase())
+        })
 }
 
 /// Active download, changed in the last 5 minutes, or an online-only placeholder.
 pub fn leave_alone(name: &str, mtime: f64, attrs: u32, now: f64) -> bool {
-    let ext = ext_lower(name);
+    let ext = ext_lower(Path::new(name));
     let ext = ext.as_str();
     let active =
         PARTIAL_EXTS.contains(&ext) && !(DEAD_EXTS.contains(&ext) && now - mtime > DEAD_SECS);
@@ -255,12 +256,14 @@ mod tests {
     }
 
     #[test]
-    fn extensions_follow_splitext() {
-        assert_eq!(ext_lower("a.TXT"), ".txt");
-        assert_eq!(ext_lower("a.tar.GZ"), ".gz");
-        assert_eq!(ext_lower(".bashrc"), "");
-        assert_eq!(ext_lower("noext"), "");
-        assert_eq!(ext_lower("z.!qB"), ".!qb");
+    fn extensions_follow_python_suffix() {
+        let ext = |n: &str| ext_lower(Path::new(n));
+        assert_eq!(ext("a.TXT"), ".txt");
+        assert_eq!(ext("a.tar.GZ"), ".gz");
+        assert_eq!(ext(".bashrc"), "");
+        assert_eq!(ext("noext"), "");
+        assert_eq!(ext("z.!qB"), ".!qb");
+        assert_eq!(ext(r"C:\d.x\noext"), "");
     }
 
     #[test]

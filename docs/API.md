@@ -9,7 +9,7 @@ preview; the real one is selected when `window.__TAURI_INTERNALS__` exists.
 ## Commands
 | Command | Args | Returns | Notes |
 |---|---|---|---|
-| `app_info` | | `AppInfo` | version, data dir |
+| `app_info` | | `AppInfo` | version |
 | `quick_folders` | | `QuickFolders` | shell-resolved Downloads/Desktop/Documents |
 | `pick_folder` | | `string \| null` | native folder dialog |
 | `check_folder` | `path` | `FolderCheck` | same rules and reasons as `check_root` |
@@ -17,9 +17,9 @@ preview; the real one is selected when `window.__TAURI_INTERNALS__` exists.
 | `cancel_scan` | `id` | | partial results already sent stay valid; `Done{cancelled:true}` follows |
 | `apply_sort` | `root`, `moves: Move[]`, `recentHours` | `ActionResult` | writes the undo log |
 | `trash_paths` | `root`, `paths: string[]` | `ActionResult` | Large & Old, Leftovers |
-| `trash_duplicates` | `root`, `removals: DupRemoval[]` | `ActionResult` | |
+| `trash_duplicates` | `root`, `removals: string[][]` | `ActionResult` | paths to remove, one list per group; the group is looked up in the last scan and must keep a copy |
 | `trash_redownloads` | `root`, `pairs: Redownload[]`, `removing: string[]` | `ActionResult` | |
-| `trash_similar` | `root`, `removals: SimilarRemoval[]` | `ActionResult` | keeps at least one per group |
+| `trash_similar` | `root`, `removals: string[][]` | `ActionResult` | as `trash_duplicates`; keeps at least one per group |
 | `trash_empty_dirs` | `root`, `paths: string[]` | `ActionResult` | |
 | `peek_undo` | | `UndoInfo \| null` | |
 | `undo_last_sort` | | `ActionResult` | |
@@ -33,7 +33,7 @@ preview; the real one is selected when `window.__TAURI_INTERNALS__` exists.
 | `open_recycle_bin` | | | opens Explorer's Recycle Bin |
 | `reveal_in_explorer` | `path` | | `explorer /select,` only; never executes the file |
 | `reminder_status` | | `ReminderStatus` | |
-| `reminder_enable` / `reminder_disable` | `schedule` / | `ReminderStatus` | scan-only task, off by default |
+| `reminder_enable` / `reminder_disable` | | `ReminderStatus` | scan-only weekly task, off by default |
 
 Every action command that sends something to the Recycle Bin calls `settings::record_freed` for what actually went.
 

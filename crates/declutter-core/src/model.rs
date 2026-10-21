@@ -95,7 +95,7 @@ dto! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
-pub enum Phase { Walking, Comparing, Hashing, Similar, Done }
+pub enum Phase { Walking, Comparing, Hashing, Similar }
 
 dto! {
     pub struct Progress {
@@ -167,7 +167,6 @@ dto! {
         pub remember_last_folder: bool,
         pub pins: Vec<String>,
         pub active_preset: Option<String>,
-        pub reminder_enabled: bool,
     }
 }
 
@@ -177,7 +176,7 @@ dto! {
 }
 
 dto! {
-    pub struct ReminderStatus { pub enabled: bool, pub schedule: String, pub next_run: Option<String> }
+    pub struct ReminderStatus { pub enabled: bool, pub next_run: Option<String> }
 }
 
 dto! {
@@ -185,17 +184,7 @@ dto! {
 }
 
 dto! {
-    /// The copies of one duplicate group the user chose to remove (the group is sent back so the shell can verify
-    /// a kept copy still exists right now).
-    pub struct DupRemoval { pub group: DupGroup, pub remove: Vec<String> }
-}
-
-dto! {
-    pub struct SimilarRemoval { pub group: SimilarGroup, pub remove: Vec<String> }
-}
-
-dto! {
-    pub struct AppInfo { pub version: String, pub data_dir: String }
+    pub struct AppInfo { pub version: String }
 }
 
 /// What `export_csv` writes. The UI sends the rows it is showing; nothing is re-scanned.

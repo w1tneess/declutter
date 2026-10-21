@@ -9,8 +9,9 @@ use std::fs;
 
 use crate::ctx::Ctx;
 use crate::model::{Preset, PresetRule};
+use crate::paths::{ext_lower, PROTECTED_DIRS};
 use crate::settings;
-use crate::sizes::{dot_ext, CATEGORIES};
+use crate::sort::{stays, CATEGORIES};
 use crate::walk::Entry;
 
 const PRESETS_FILE: &str = "presets.json";
@@ -21,20 +22,6 @@ const MAX_RULES: usize = 40;
 const MAX_EXTS: usize = 100;
 const MAX_EXT_LEN: usize = 16;
 const MAX_COMPONENT: usize = 100;
-// shortcut: mirrors core.py SKIP_SORT_EXTS + DEAD_EXTS (never moved by the built-in sort); share sort.rs's at integration.
-const SKIP_EXTS: [&str; 5] = [".lnk", ".url", ".ini", ".crdownload", ".part"];
-// Mirrors core.py PROTECTED_DIRS: the walk never enters these, so files moved there would vanish from view.
-const PROTECTED: [&str; 9] = [
-    "windows",
-    "program files",
-    "program files (x86)",
-    "programdata",
-    "$recycle.bin",
-    "system volume information",
-    ".git",
-    "node_modules",
-    "appdata",
-];
 const RESERVED: [&str; 22] = [
     "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
     "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
@@ -117,7 +104,8 @@ fn valid_component(c: &str) -> bool {
             .chars()
             .any(|ch| ch.is_control() || r#"<>:"/\|?*"#.contains(ch))
         && !RESERVED.contains(&stem)
-        && !PROTECTED.contains(&lower.as_str())
+        // The walk never enters these, so files moved there would vanish from view.
+        && !PROTECTED_DIRS.contains(&lower.as_str())
 }
 
 /// One or two plain folder names below the chosen folder, or None.
@@ -140,7 +128,7 @@ fn check_ext(e: &str) -> Result<(), String> {
             "\"{e}\" is not a file type like .pdf (lower case, starting with a dot)."
         ));
     }
-    if SKIP_EXTS.contains(&e) {
+    if stays(e) {
         return Err(format!(
             "{e} files are never moved, so they can't be part of a preset."
         ));
@@ -266,12 +254,10 @@ pub fn delete_preset(ctx: &Ctx, id: &str) -> Result<Vec<Preset>, String> {
     store(ctx, user)
 }
 
-/// Where a file goes under `preset`; None leaves it in place (same exclusions as the built-in classifier).
+/// Where a file goes under `preset`; None leaves it in place. Never-moved files (`sort::stays`) are skipped by
+/// `sort::plan_sort_with` before it asks, and a saved preset cannot name their extensions.
 pub fn classify(preset: &Preset, entry: &Entry) -> Option<Vec<String>> {
-    let ext = dot_ext(&entry.path)?;
-    if SKIP_EXTS.contains(&ext.as_str()) {
-        return None;
-    }
+    let ext = ext_lower(&entry.path);
     // The folder is re-checked so a preset that skipped validation can never aim outside the chosen folder.
     preset
         .rules

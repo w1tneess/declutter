@@ -5,13 +5,14 @@ use std::fs::{self, File};
 use std::path::{Component, Path, PathBuf};
 
 use crate::ctx::Ctx;
-use crate::dupes::{ext, path_key, DEAD_EXTS};
+use crate::dupes::path_key;
 use crate::model::Leftover;
+use crate::paths::{ext_lower, DEAD_EXTS, DEAD_SECS};
 use crate::platform::KnownFolder;
 use crate::walk::Entry;
 
 const DAY: f64 = 86400.0;
-const INSTALLER_EXTS: [&str; 3] = ["exe", "msi", "iso"];
+const INSTALLER_EXTS: [&str; 3] = [".exe", ".msi", ".iso"];
 
 /// Reasons (exact strings): "Unpacked .zip", "Old installer", "Unfinished download". Size descending, ties by path.
 /// A cancel returns nothing, as in the oracle.
@@ -29,15 +30,15 @@ pub fn find_leftovers(ctx: &Ctx, entries: &[Entry]) -> Vec<Leftover> {
         if ctx.cancelled() {
             return Vec::new();
         }
-        let (x, age) = (ext(&e.path), now - e.mtime);
-        let reason = if DEAD_EXTS.contains(&x.as_str()) && age > 3.0 * DAY {
+        let (x, age) = (ext_lower(&e.path), now - e.mtime);
+        let reason = if DEAD_EXTS.contains(&x.as_str()) && age > DEAD_SECS {
             "Unfinished download"
         } else if INSTALLER_EXTS.contains(&x.as_str())
             && age > 7.0 * DAY
             && path_key(&e.path).starts_with(&dl)
         {
             "Old installer"
-        } else if x == "zip" && is_extracted(&e.path) {
+        } else if x == ".zip" && is_extracted(&e.path) {
             "Unpacked .zip"
         } else {
             continue;

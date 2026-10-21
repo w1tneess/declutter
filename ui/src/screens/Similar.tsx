@@ -6,7 +6,7 @@ import { Badge, Button, Icon } from '../design/components';
 import { ResultList, type RowProps } from '../design/ResultList';
 import { baseName, humanSize, plural, relPath } from '../format';
 import { allowKeepingOne, groupRemovals } from '../state/rules';
-import { act, alert, binWording, exportCsv, go, reveal, toast, unpinned, useApp } from '../state/store';
+import { alert, exportCsv, go, recycleSelected, reveal, toast, unpinned, useApp } from '../state/store';
 import { FilterField, ListFooter, matches, ScreenHeader, showDetails, TabPlaceholder, useTabState } from './common';
 
 type Row = { head: true; n: number; i: number } | { head?: false; f: SimilarFile; first: boolean };
@@ -68,14 +68,7 @@ export function Similar() {
     } catch {
       return void alert('Keep one picture', 'Keep at least one picture in each group, then try again.');
     }
-    const n = removals.reduce((a, r) => a + r.remove.length, 0);
-    await act({
-      title: 'Send to Recycle Bin?',
-      body: binWording(n),
-      confirmLabel: `Send ${plural(n, 'item')}`,
-      run: (root) => api.trashSimilar(root, removals),
-      done: (k) => `Sent ${plural(k, 'item')} to the Recycle Bin. Restore them from the Bin if needed.`,
-    });
+    await recycleSelected(removals.flat().length, (root) => api.trashSimilar(root, removals));
   };
 
   if (!asked && state !== 'ready' && status !== 'scanning')

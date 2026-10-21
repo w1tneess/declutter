@@ -21,7 +21,8 @@ use crate::walk::Entry;
 /// `["Images", "Screenshots"]`), or None to leave the file where it is. Sort presets (core-C) supply their own.
 pub type Classifier<'a> = &'a dyn Fn(&Entry) -> Option<Vec<String>>;
 
-const CATEGORIES: &[(&str, &[&str])] = &[
+/// The built-in categories; also the Downloads preset and the Large & Old type breakdown.
+pub(crate) const CATEGORIES: &[(&str, &[&str])] = &[
     (
         "Images",
         &[
@@ -70,14 +71,13 @@ static SUB_BUCKETS: LazyLock<[(&str, Regex); 2]> = LazyLock::new(|| {
 });
 
 /// Shortcuts, config files and dead downloads are never moved, whatever the classifier says.
-fn stays(ext: &str) -> bool {
+pub(crate) fn stays(ext: &str) -> bool {
     SKIP_SORT_EXTS.contains(&ext) || DEAD_EXTS.contains(&ext)
 }
 
 /// The built-in classifier: category by extension, Images sub-buckets, `.lnk .url .ini` and dead downloads stay.
 pub fn builtin_classifier(entry: &Entry) -> Option<Vec<String>> {
-    let name = entry.path.file_name()?.to_string_lossy();
-    let ext = ext_lower(&name);
+    let ext = ext_lower(&entry.path);
     if stays(&ext) {
         return None;
     }
@@ -127,8 +127,7 @@ pub fn plan_sort_with(
         let (Some(parent), Some(name)) = (e.path.parent(), e.path.file_name()) else {
             continue;
         };
-        if !parent.as_os_str().eq_ignore_ascii_case(root.as_os_str())
-            || stays(&ext_lower(&name.to_string_lossy()))
+        if !parent.as_os_str().eq_ignore_ascii_case(root.as_os_str()) || stays(&ext_lower(&e.path))
         {
             continue;
         }

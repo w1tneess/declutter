@@ -194,10 +194,7 @@ export function Settings() {
             label="Weekly reminder"
             description={`Once a week Declutter looks through your folder and shows a notification if there is something to tidy. It only scans: it never moves, deletes or changes a file.${reminder?.enabled && reminder.nextRun ? ` Next check: ${reminder.nextRun}.` : ''}`}
             checked={reminder?.enabled ?? false}
-            onChange={(on) => void run(on ? api.reminderEnable('weekly') : api.reminderDisable(), (r) => {
-              setReminder(r);
-              void updateSettings({ reminderEnabled: r.enabled });
-            })}
+            onChange={(on) => void run(on ? api.reminderEnable() : api.reminderDisable(), setReminder)}
           />
         </Card>
 

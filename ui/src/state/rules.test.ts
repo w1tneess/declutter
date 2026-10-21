@@ -7,7 +7,7 @@ const g = (...paths: string[]) => ({ files: paths.map((path) => ({ path })) });
 describe('groupRemovals (SPEC rule 6)', () => {
   it('returns only groups with something to remove', () => {
     const groups = [g('a1', 'a2', 'a3'), g('b1', 'b2')];
-    expect(groupRemovals(groups, (p) => p === 'a2' || p === 'a3')).toEqual([{ group: groups[0], remove: ['a2', 'a3'] }]);
+    expect(groupRemovals(groups, (p) => p === 'a2' || p === 'a3')).toEqual([['a2', 'a3']]);
   });
 
   it('refuses a selection that removes every copy of a group', () => {
@@ -46,7 +46,21 @@ describe('unpinned', () => {
   it('drops pinned paths and anything inside them, ignoring case', async () => {
     const { unpinned, useApp } = await import('./store');
     const p = (s: string) => s.replaceAll('/', '\\');
-    useApp.setState({ settings: { theme: 'system', recentHours: 24, minMb: 0, olderDays: 0, lastFolder: null, rememberLastFolder: false, pins: [p('C:/D/Keep/')], activePreset: null, reminderEnabled: false } });
+    useApp.setState({ settings: { theme: 'system', recentHours: 24, minMb: 0, olderDays: 0, lastFolder: null, rememberLastFolder: false, pins: [p('C:/D/Keep/')], activePreset: null } });
     expect(unpinned([p('C:/D/keep'), p('c:/d/KEEP/a.txt'), p('C:/D/Keeper.txt'), p('C:/D/x.txt')])).toEqual([p('C:/D/Keeper.txt'), p('C:/D/x.txt')]);
+  });
+});
+
+describe('recycleSelected', () => {
+  it('asks nothing and runs nothing when pins left no items', async () => {
+    const { ALL_PINNED, recycleSelected, useApp } = await import('./store');
+    useApp.setState({ folder: 'C:/D', dialog: null, toasts: [] });
+    let ran = false;
+    await recycleSelected(0, async () => {
+      ran = true;
+      return { count: 0, errors: [] };
+    });
+    const s = useApp.getState();
+    expect([ran, s.dialog, s.toasts.map((t) => t.text)]).toEqual([false, null, [ALL_PINNED]]);
   });
 });

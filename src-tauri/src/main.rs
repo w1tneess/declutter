@@ -10,9 +10,8 @@ use std::time::Duration;
 
 use declutter_app::{App, Core};
 use declutter_core::model::{
-    ActionResult, AppInfo, BinInfo, DupRemoval, ExportPayload, FolderCheck, Move, Preset,
-    QuickFolders, Redownload, ReminderStatus, ScanEvent, ScanOptions, Settings, SimilarRemoval,
-    SpaceFreed, UndoInfo,
+    ActionResult, AppInfo, BinInfo, ExportPayload, FolderCheck, Move, Preset, QuickFolders,
+    Redownload, ReminderStatus, ScanEvent, ScanOptions, Settings, SpaceFreed, UndoInfo,
 };
 use declutter_core::platform::SystemPlatform;
 use tauri::ipc::Channel;
@@ -101,7 +100,7 @@ async fn trash_paths(app: AppState<'_>, root: String, paths: Vec<String>) -> Res
 async fn trash_duplicates(
     app: AppState<'_>,
     root: String,
-    removals: Vec<DupRemoval>,
+    removals: Vec<Vec<String>>,
 ) -> Res<ActionResult> {
     blocking(app, move |a| a.trash_duplicates(&root, &removals)).await
 }
@@ -120,7 +119,7 @@ async fn trash_redownloads(
 async fn trash_similar(
     app: AppState<'_>,
     root: String,
-    removals: Vec<SimilarRemoval>,
+    removals: Vec<Vec<String>>,
 ) -> Res<ActionResult> {
     blocking(app, move |a| a.trash_similar(&root, &removals)).await
 }
@@ -215,8 +214,8 @@ async fn reminder_status(app: AppState<'_>) -> Res<ReminderStatus> {
 }
 
 #[tauri::command]
-async fn reminder_enable(app: AppState<'_>, schedule: String) -> Res<ReminderStatus> {
-    blocking(app, move |a| a.reminder_enable(&schedule)).await
+async fn reminder_enable(app: AppState<'_>) -> Res<ReminderStatus> {
+    blocking(app, |a| a.reminder_enable()).await
 }
 
 #[tauri::command]

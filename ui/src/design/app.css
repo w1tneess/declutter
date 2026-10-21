@@ -537,15 +537,7 @@ select {
   padding-left: var(--sp-8);
 }
 
-/* Checkbox: a real input over a drawn box; the box border meets 3:1. */
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: var(--control-h);
-  cursor: pointer;
-}
-
+/* The tick box drawn in result rows; its border meets 3:1. */
 .box {
   position: relative;
   display: grid;
@@ -558,33 +550,18 @@ select {
   background: var(--surface);
 }
 
-.box input {
-  position: absolute;
-  inset: -1px;
-  margin: 0;
-  opacity: 0;
-  cursor: inherit;
-}
-
 .box .icon {
   visibility: hidden;
   color: var(--on-accent);
 }
 
-.box:has(input:checked),
 .box-visual.is-on {
   border-color: var(--accent);
   background: var(--accent);
 }
 
-.box:has(input:checked) .icon,
 .box-visual.is-on .icon {
   visibility: visible;
-}
-
-.box:has(input:focus-visible) {
-  outline: var(--focus-w) solid var(--focus);
-  outline-offset: 1px;
 }
 
 .box-spacer {

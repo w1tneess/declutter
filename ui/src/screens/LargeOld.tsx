@@ -6,7 +6,7 @@ import type { SizeEntry } from '../api/generated/SizeEntry';
 import { Badge, Button, Card, NumberField, Segmented } from '../design/components';
 import { ResultList, ROW_H, type RowProps } from '../design/ResultList';
 import { baseName, daysOld, humanSize, parentRel, plural, relPath } from '../format';
-import { act, binWording, exportCsv, reveal, startScan, unpinned, updateSettings, useApp } from '../state/store';
+import { exportCsv, recycleSelected, reveal, startScan, unpinned, updateSettings, useApp } from '../state/store';
 import { FilterField, ListFooter, matches, ScreenHeader, showDetails, TabPlaceholder, useTabState } from './common';
 
 type Row =
@@ -88,13 +88,7 @@ export function LargeOld() {
 
   const remove = () => {
     const paths = unpinned(sel.list());
-    void act({
-      title: 'Send to Recycle Bin?',
-      body: binWording(paths.length),
-      confirmLabel: `Send ${plural(paths.length, 'item')}`,
-      run: (root) => api.trashPaths(root, paths),
-      done: (k) => `Sent ${plural(k, 'item')} to the Recycle Bin. Restore them from the Bin if needed.`,
-    });
+    void recycleSelected(paths.length, (root) => api.trashPaths(root, paths));
   };
 
   return (

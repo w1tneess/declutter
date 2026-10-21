@@ -147,10 +147,10 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
   let undo: (UndoInfo & { srcs: string[]; at: number }) | null = null;
   let freed: SpaceFreed = { bytes: 7.4 * 1024 * MB, files: 312, since: '2026-03-02' };
   let bin = { bytes: 2.3 * 1024 * MB, items: 148 };
-  let reminder: ReminderStatus = { enabled: false, schedule: 'weekly', nextRun: null };
+  let reminder: ReminderStatus = { enabled: false, nextRun: null };
   let settings: Settings = {
     theme: 'system', recentHours: 24, minMb: 100, olderDays: 0, lastFolder: null, rememberLastFolder: false,
-    pins: [], activePreset: null, reminderEnabled: false,
+    pins: [], activePreset: null,
   };
   const builtins: Preset[] = [
     { id: 'downloads', name: 'Downloads', builtin: true, rules: [{ extensions: ['.exe', '.msi'], folder: 'Installers' }, { extensions: ['.pdf', '.docx'], folder: 'Documents' }, { extensions: ['.zip', '.7z'], folder: 'Archives' }] },
@@ -192,7 +192,7 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
 
   const api: Api & { lastExport: unknown } = {
     lastExport: null,
-    appInfo: async () => ({ version: '1.0.0', dataDir: `${HOME}\\AppData\\Local\\Declutter` }),
+    appInfo: async () => ({ version: '1.0.0' }),
     quickFolders: async () => ({ downloads: `${HOME}\\Downloads`, desktop: `${HOME}\\Desktop`, documents: `${HOME}\\Documents` }),
     pickFolder: async () => (options.pick === undefined ? `${HOME}\\Downloads` : options.pick),
     pickSavePath: async (name) => `${HOME}\\Documents\\${name}`,
@@ -269,9 +269,9 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
       return ok(moves.length);
     },
     trashPaths: async (_root, paths) => trash(paths),
-    trashDuplicates: async (_root, removals) => trash(removals.flatMap((r) => r.remove)),
+    trashDuplicates: async (_root, removals) => trash(removals.flat()),
     trashRedownloads: async (_root, pairs, removing) => trash(pairs.filter((p) => !removing.includes(p.original.path)).map((p) => p.copy.path)),
-    trashSimilar: async (_root, removals) => trash(removals.flatMap((r) => r.remove)),
+    trashSimilar: async (_root, removals) => trash(removals.flat()),
     trashEmptyDirs: async (_root, paths) => trash(paths),
     peekUndo: async () => (undo ? { folder: undo.folder, count: undo.count, ageSeconds: Math.floor((Date.now() - undo.at) / 1000) } : null),
     async undoLastSort() {
@@ -319,7 +319,7 @@ export function createMockApi(options: MockOptions = fromUrl()): Api & { lastExp
     openRecycleBin: async () => undefined,
     revealInExplorer: async () => undefined,
     reminderStatus: async () => reminder,
-    reminderEnable: async (schedule) => (reminder = { enabled: true, schedule, nextRun: 'Monday 10:00' }),
+    reminderEnable: async () => (reminder = { enabled: true, nextRun: 'Monday 10:00' }),
     reminderDisable: async () => (reminder = { ...reminder, enabled: false, nextRun: null }),
     onFolderDrop: () => () => undefined,
   };

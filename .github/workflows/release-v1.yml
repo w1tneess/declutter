@@ -159,7 +159,8 @@ jobs:
         run: |
           installers=(target/release/bundle/nsis/*-setup.exe)
           exes=(target/release/*.exe)
-          [ "${#installers[@]}" -eq 1 ] && [ "${#exes[@]}" -eq 1 ] || { echo "expected one installer and one exe"; exit 1; }
+          [ "${#installers[@]}" -eq 1 ] || { echo "expected one installer, found: ${installers[*]}"; exit 1; }
+          [ "${#exes[@]}" -eq 1 ] || { echo "expected one exe, found: ${exes[*]}"; exit 1; }
           mkdir installer
           cp "${installers[0]}" installer/
           powershell -NoProfile -Command "Compress-Archive -Path '${exes[0]}' -DestinationPath 'installer/Declutter_${VERSION}_x64-portable.zip'"

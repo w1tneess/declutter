@@ -38,8 +38,8 @@ preview; the real one is selected when `window.__TAURI_INTERNALS__` exists.
 Every action command that sends something to the Recycle Bin calls `settings::record_freed` for what actually went.
 
 ## Scan events (`ScanEvent`, in this order, each phase as soon as it finishes)
-`progress` (many) -> `skipped` -> `sort` -> `largeOld` -> `leftovers` -> `breakdown` -> `emptyDirs` -> `redownloads`
-(after `duplicates` so exact copies are excluded) -> `duplicates` -> `similar` (only if requested) -> `done`.
+`progress` (many) -> `skipped` -> `sort` -> `largeOld` -> `leftovers` -> `breakdown` -> `emptyDirs` -> `duplicates`
+-> `redownloads` (after `duplicates` so exact copies are excluded) -> `similar` (only if requested) -> `done`.
 `progress.total` is null while walking, then a number so the bar becomes determinate; `etaSecs` appears once hashing
 has a rate. `error` ends a scan that cannot continue (for example a refused folder). The UI must render each
 result as it arrives and stay responsive (no frame over 50 ms).
@@ -47,6 +47,9 @@ result as it arrives and stay responsive (no frame over 50 ms).
 ## Security rules for the shell
 - Validate every path with `require_root` and confirm it lies inside the scanned root before acting; re-check the disk
   inside the core (already required by the contract), never trust the UI's copy of a result.
-- Minimal Tauri capabilities (dialog open/save, notification, window effects, shell none). Strict CSP, no remote content,
-  no `eval`, no `dangerouslySetInnerHTML`. `reveal_in_explorer` and `open_recycle_bin` use fixed arguments.
+- Minimal Tauri capabilities (`src-tauri/capabilities/default.json`): the UI is granted exactly `dialog:allow-save`
+  (CSV export), `core:event:allow-listen` and `core:event:allow-unlisten` (the folder drag-and-drop listener), and
+  nothing else: no shell, fs or http. The folder picker, notification and window effects run in Rust and need no UI
+  permission. Strict CSP, no remote content, no `eval`, no `dangerouslySetInnerHTML`. `reveal_in_explorer` and
+  `open_recycle_bin` use fixed arguments.
 - No telemetry, no network access of any kind in the app.

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use declutter_app::{App, Engine};
 use declutter_core::model::{
@@ -37,7 +37,12 @@ impl Platform for FakePlatform {
     }
     fn recycle(&self, path: &Path) -> std::io::Result<()> {
         self.recycled.lock().unwrap().push(path.to_path_buf());
-        Ok(())
+        // Like the real bin, the item leaves the folder (always a temp tree here).
+        if path.is_dir() {
+            fs::remove_dir_all(path)
+        } else {
+            fs::remove_file(path)
+        }
     }
     fn data_dir(&self) -> PathBuf {
         self.data.clone()
@@ -243,7 +248,8 @@ struct Env {
 }
 
 fn env(engine: FakeEngine) -> Env {
-    let tmp = tempfile::tempdir().unwrap();
+    // `%TEMP%` lives under AppData, which the core refuses by design, so trees go under the target dir.
+    let tmp = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
     let root = tmp.path().join("work");
     fs::create_dir_all(&root).unwrap();
     for (name, body) in [
@@ -646,9 +652,15 @@ fn remind_with_no_saved_folder_says_nothing() {
 }
 
 #[test]
-#[ignore = "needs core implementations (trash::to_recycle_bin, settings::record_freed)"]
 fn an_offered_file_goes_to_the_bin_and_is_tallied() {
     let e = env(FakeEngine::default());
+    // Older than the fake clock, so the core's "just changed" rule (SPEC rule 8) does not hold it back.
+    fs::File::options()
+        .write(true)
+        .open(e.root.join("a.txt"))
+        .unwrap()
+        .set_modified(UNIX_EPOCH + Duration::from_secs(1_699_990_000))
+        .unwrap();
     run(&e, &e.root, options(false), false);
     let r = e
         .app
@@ -659,4 +671,6 @@ fn an_offered_file_goes_to_the_bin_and_is_tallied() {
         *e.platform.recycled.lock().unwrap(),
         vec![e.root.join("a.txt")]
     );
+    let freed = e.app.space_freed();
+    assert_eq!((freed.bytes, freed.files), (1, 1));
 }

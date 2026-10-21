@@ -218,14 +218,14 @@ pub fn write_csv(path: &Path, csv: &str) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    fn lines(csv: &str) -> Vec<&str> {
+    fn lines(csv: &str) -> Vec<String> {
         let body = csv.strip_prefix('\u{feff}').expect("UTF-8 BOM first");
         let body = body.strip_suffix("\r\n").expect("ends with CRLF");
         assert!(
             !body.replace("\r\n", "").contains('\n'),
             "only CRLF line ends: {body:?}"
         );
-        body.split("\r\n").collect()
+        body.split("\r\n").map(str::to_owned).collect()
     }
 
     fn file(path: &str, size: u64) -> FileRef {

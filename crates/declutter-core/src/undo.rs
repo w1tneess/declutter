@@ -61,21 +61,12 @@ pub fn append_log(ctx: &Ctx, done: &[Move]) -> Result<(), String> {
     write_log(ctx, &batches[start..]).map_err(|e| e.to_string())
 }
 
-pub fn can_undo(ctx: &Ctx) -> bool {
-    !read_log(ctx).is_empty()
-}
-
 fn moves_of(batch: Option<&Value>) -> &[Value] {
     batch
         .and_then(|b| b.get("moves"))
         .and_then(Value::as_array)
         .map(Vec::as_slice)
         .unwrap_or_default()
-}
-
-/// Number of moves in the batch `undo_last` would reverse.
-pub fn undo_count(ctx: &Ctx) -> u32 {
-    moves_of(read_log(ctx).last()).len() as u32
 }
 
 pub fn peek_undo(ctx: &Ctx) -> Option<UndoInfo> {
@@ -241,7 +232,7 @@ mod tests {
         let log = read_log(&c);
         assert_eq!(log.len(), 20);
         assert_eq!(log[0]["moves"][0]["src"], r"C:\r\f5.txt");
-        assert_eq!(undo_count(&c), 1);
+        assert_eq!(moves_of(log.last()).len(), 1);
         let info = peek_undo(&c).unwrap();
         assert_eq!(info.folder, r"C:\r");
         assert_eq!(info.age_seconds, Some(0.0));
@@ -254,7 +245,7 @@ mod tests {
         std::fs::create_dir_all(tmp.path().join("roaming")).unwrap();
         let old = r#"[{"time": "2025-01-01 10:00:00", "moves": [{"src": "C:\\r\\a.txt", "dst": "C:\\r\\Documents\\a.txt"}]}]"#;
         std::fs::write(tmp.path().join("roaming").join(LOG_NAME), old).unwrap();
-        assert!(can_undo(&c));
+        assert_eq!(read_log(&c).len(), 1);
         assert!(!tmp.path().join("roaming").join(LOG_NAME).exists());
         assert!(tmp.path().join("local").join(LOG_NAME).exists());
     }
@@ -275,7 +266,6 @@ mod tests {
         ] {
             std::fs::write(local.join(LOG_NAME), bad).unwrap();
             assert!(peek_undo(&c).is_none(), "{bad}");
-            let _ = undo_count(&c);
             let _ = undo_last(&c);
         }
         std::fs::write(local.join(LOG_NAME), r#"[{"moves": ["x", {"src": "a"}]}]"#).unwrap();
@@ -288,7 +278,7 @@ mod tests {
                 "Skipped a damaged log entry."
             ]
         );
-        assert!(!can_undo(&c));
+        assert!(read_log(&c).is_empty());
     }
 
     #[test]

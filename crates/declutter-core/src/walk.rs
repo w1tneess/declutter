@@ -1,5 +1,5 @@
 //! The single directory walk every analysis reuses. Owner: core-A. See CONTRACT "Walk".
-//! Port of walk_files / scan_entries. One pass, stats from the directory listing (no extra syscalls per file).
+//! Port of walk_files. One pass, stats from the directory listing (no extra syscalls per file).
 
 use std::collections::HashSet;
 use std::os::windows::fs::MetadataExt;
@@ -8,9 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::ctx::Ctx;
 use crate::model::{Phase, Progress};
-use crate::paths::{
-    is_app_folder, is_project, leave_alone, pin_key, require_root, ATTR_HIDDEN, PROTECTED_DIRS,
-};
+use crate::paths::{is_app_folder, is_project, leave_alone, pin_key, ATTR_HIDDEN, PROTECTED_DIRS};
 use crate::platform::filetime_to_unix;
 
 /// A regular file that survived the walk rules. Times are Unix seconds.
@@ -110,10 +108,4 @@ pub fn walk_files(ctx: &Ctx, root: &Path, ignore: &[PathBuf]) -> Scan {
         .sort_by(|a, b| a.path.as_os_str().cmp(b.path.as_os_str()));
     scan.skipped.sort();
     scan
-}
-
-/// `require_root` + `walk_files`.
-pub fn scan_entries(ctx: &Ctx, root: &Path, ignore: &[PathBuf]) -> Result<Scan, String> {
-    let root = require_root(ctx, root)?;
-    Ok(walk_files(ctx, &root, ignore))
 }

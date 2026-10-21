@@ -118,5 +118,5 @@ pub fn run(op: &str, env: &Env, fx: &Value) -> Option<Value> {
 
 /// The real walk, as the oracle's analysis functions use internally.
 fn scan(ctx: &Ctx, root: &Path) -> Vec<Entry> {
-    walk::scan_entries(ctx, root, &[]).unwrap().entries
+    walk::walk_files(ctx, root, &[]).entries
 }

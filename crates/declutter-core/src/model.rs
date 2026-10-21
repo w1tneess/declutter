@@ -29,12 +29,12 @@ dto! {
 }
 
 dto! {
-    pub struct FileRef { pub path: String, pub size: u64, pub mtime: f64 }
+    pub struct FileRef { pub path: String, #[ts(type = "number")] pub size: u64, pub mtime: f64 }
 }
 
 dto! {
     /// One planned move. `category` is "Images" or "Images/Screenshots".
-    pub struct Move { pub src: String, pub dst: String, pub size: u64, pub category: String }
+    pub struct Move { pub src: String, pub dst: String, #[ts(type = "number")] pub size: u64, pub category: String }
 }
 
 dto! {
@@ -47,7 +47,7 @@ dto! {
 
 dto! {
     /// Identical files. `files[0]` is the suggested keeper (oldest modified).
-    pub struct DupGroup { pub size: u64, pub files: Vec<FileRef> }
+    pub struct DupGroup { #[ts(type = "number")] pub size: u64, pub files: Vec<FileRef> }
 }
 
 dto! {
@@ -57,12 +57,12 @@ dto! {
 
 dto! {
     /// A file that is probably no longer needed. Never preselected, never called "safe".
-    pub struct Leftover { pub path: String, pub size: u64, pub mtime: f64, pub reason: String }
+    pub struct Leftover { pub path: String, #[ts(type = "number")] pub size: u64, pub mtime: f64, pub reason: String }
 }
 
 dto! {
     pub struct SimilarFile {
-        pub path: String, pub size: u64, pub mtime: f64, pub width: u32, pub height: u32,
+        pub path: String, #[ts(type = "number")] pub size: u64, pub mtime: f64, pub width: u32, pub height: u32,
         /// Hamming distance to the group's first file (0 = identical hash).
         pub distance: u32,
     }
@@ -75,7 +75,7 @@ dto! {
 
 dto! {
     /// A row in the folder-size or file-type breakdown. `name` is a path (folders) or a category (types).
-    pub struct SizeEntry { pub name: String, pub bytes: u64, pub files: u64 }
+    pub struct SizeEntry { pub name: String, #[ts(type = "number")] pub bytes: u64, #[ts(type = "number")] pub files: u64 }
 }
 
 dto! {
@@ -100,10 +100,10 @@ pub enum Phase { Walking, Comparing, Hashing, Similar, Done }
 dto! {
     pub struct Progress {
         pub phase: Phase,
-        pub done: u64,
+        #[ts(type = "number")] pub done: u64,
         /// None while the total is unknown (the walk). Some(n) once it is, so the bar can be determinate.
-        pub total: Option<u64>,
-        pub bytes: u64,
+        #[ts(type = "number | null")] pub total: Option<u64>,
+        #[ts(type = "number")] pub bytes: u64,
         pub eta_secs: Option<f64>,
         /// Plain-language status line, e.g. "Checking 14 possible duplicates in full".
         pub label: String,
@@ -141,7 +141,7 @@ pub enum ScanEvent {
     Redownloads { pairs: Vec<Redownload> },
     Similar { groups: Vec<SimilarGroup> },
     #[serde(rename_all = "camelCase")]
-    Done { cancelled: bool, took_ms: u64 },
+    Done { cancelled: bool, #[ts(type = "number")] took_ms: u64 },
     Error { message: String },
 }
 
@@ -173,7 +173,7 @@ dto! {
 
 dto! {
     /// Local tally of what the user sent to the Recycle Bin through Declutter. Never leaves the machine.
-    pub struct SpaceFreed { pub bytes: u64, pub files: u64, pub since: Option<String> }
+    pub struct SpaceFreed { #[ts(type = "number")] pub bytes: u64, #[ts(type = "number")] pub files: u64, pub since: Option<String> }
 }
 
 dto! {
@@ -181,7 +181,7 @@ dto! {
 }
 
 dto! {
-    pub struct BinInfo { pub bytes: u64, pub items: u64 }
+    pub struct BinInfo { #[ts(type = "number")] pub bytes: u64, #[ts(type = "number")] pub items: u64 }
 }
 
 dto! {

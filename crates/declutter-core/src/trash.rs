@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::ctx::Ctx;
 use crate::model::ActionResult;
-use crate::paths::{is_inside, is_project, leave_alone, require_root, FOLDER_JUNK};
+use crate::paths::{is_inside, is_project, leave_alone, require_root, through_link, FOLDER_JUNK};
 use crate::platform::{filetime_to_unix, DriveKind};
 
 /// Send paths to the Recycle Bin. With `root`, anything outside it (or the root itself) is refused. Refusals are
@@ -30,6 +30,10 @@ pub fn to_recycle_bin(ctx: &Ctx, paths: &[PathBuf], root: Option<&Path>) -> Acti
         if let Some(b) = &base {
             if !is_inside(&abs, b) || abs.as_os_str().eq_ignore_ascii_case(b.as_os_str()) {
                 errors.push(format!("{name}: outside the chosen folder, skipped"));
+                continue;
+            }
+            if abs.parent().is_some_and(|d| through_link(d, b)) {
+                errors.push(format!("{name}: inside a linked folder, skipped"));
                 continue;
             }
         }

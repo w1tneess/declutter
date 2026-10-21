@@ -188,7 +188,7 @@ impl App {
             recent_hours: opts.recent_hours.min(72),
             ..opts.clone()
         };
-        let mut ignore: Vec<PathBuf> = opts.ignore.iter().map(PathBuf::from).collect();
+        let mut ignore = pin_paths(&opts.ignore);
         // Saved pins count even when the UI's copy of the list is stale.
         ignore.extend(self.pins(ctx));
         let k = key(dto_path(&root));
@@ -227,12 +227,7 @@ impl App {
     }
 
     fn pins(&self, ctx: &Ctx) -> Vec<PathBuf> {
-        self.engine
-            .settings(ctx)
-            .pins
-            .iter()
-            .map(PathBuf::from)
-            .collect()
+        pin_paths(&self.engine.settings(ctx).pins)
     }
 
     /// Runs a Recycle Bin action and adds exactly what left the disk to the "space freed" tally.
@@ -587,7 +582,7 @@ impl App {
             return Ok(None);
         };
         let root = self.engine.require_root(&ctx, &local_path(&folder)?)?;
-        let pins: Vec<PathBuf> = s.pins.iter().map(PathBuf::from).collect();
+        let pins = pin_paths(&s.pins);
         let scan = self.engine.walk(&ctx, &root, &pins);
         let plan = self.engine.plan_sort(
             &ctx,
@@ -626,6 +621,19 @@ fn local_path(s: &str) -> Result<PathBuf, String> {
         );
     }
     Ok(PathBuf::from(s))
+}
+
+/// Pins spelled the way the scan spells paths: links resolved like the scanned root, so a pin made through a link
+/// still holds. A pin that cannot be resolved (gone, or not on a local drive) is kept as written.
+fn pin_paths(raw: &[String]) -> Vec<PathBuf> {
+    raw.iter()
+        .map(|s| {
+            local_path(s)
+                .ok()
+                .and_then(|p| paths::resolve(&p))
+                .unwrap_or_else(|| PathBuf::from(s))
+        })
+        .collect()
 }
 
 /// The paths the scan offered; the rest are reported.

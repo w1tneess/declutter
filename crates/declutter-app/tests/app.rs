@@ -62,6 +62,8 @@ struct FakeEngine {
     hold_walk: bool,
     fail_sort: bool,
     exclude_seen: Mutex<Vec<PathBuf>>,
+    /// The saved Never touch list.
+    pins: Mutex<Vec<String>>,
 }
 
 impl FakeEngine {
@@ -116,7 +118,7 @@ impl Engine for FakeEngine {
             older_days: 0,
             last_folder: None,
             remember_last_folder: true,
-            pins: vec![],
+            pins: self.pins.lock().unwrap().clone(),
             active_preset: None,
             reminder_enabled: false,
         }
@@ -674,6 +676,27 @@ fn a_sort_never_moves_through_a_linked_folder() {
     assert!(r.errors[0].contains("linked folder"));
     assert!(e.root.join("a.txt").exists());
     assert_eq!(fs::read_dir(&outside).unwrap().count(), 0);
+}
+
+#[test]
+fn a_pin_made_through_a_link_still_protects_the_file() {
+    let e = env(FakeEngine::default());
+    make_old(&e.root.join("a.txt"));
+    let alias = e.root.parent().unwrap().join("alias");
+    if !link_dir(&alias, &e.root) {
+        eprintln!("skipped: this system refused to create a junction or a symlink");
+        return;
+    }
+    // The same file, pinned under the link's spelling; the scan sees the real folder.
+    *e.engine.pins.lock().unwrap() = vec![dto(&alias.join("a.txt"))];
+    run(&e, &e.root, options(false), false);
+    let r = e
+        .app
+        .trash_paths(&dto(&e.root), &[dto(&e.root.join("a.txt"))])
+        .unwrap();
+    assert_eq!((r.count, r.errors.len()), (0, 1), "{:?}", r.errors);
+    assert!(r.errors[0].contains("Never touch"));
+    nothing_recycled(&e);
 }
 
 #[test]

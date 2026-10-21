@@ -109,7 +109,7 @@ pub fn require_root(ctx: &Ctx, path: &Path) -> Result<PathBuf, String> {
 
 /// The real, absolute path with links resolved, without the `\\?\` prefix `canonicalize` adds (paths shown to the
 /// user and written to the undo log must look like v0.2.2's).
-fn resolve(path: &Path) -> Option<PathBuf> {
+pub fn resolve(path: &Path) -> Option<PathBuf> {
     let c = std::fs::canonicalize(path).ok()?;
     let mut parts = c.components();
     let plain: PathBuf = match parts.next()? {

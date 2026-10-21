@@ -26,18 +26,6 @@ export function Button({ variant = 'secondary', icon, large, className, children
   );
 }
 
-export function Checkbox({ label, checked, onChange, disabled }: { label: ReactNode; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
-  return (
-    <label className={cx('check', disabled && 'is-disabled')}>
-      <span className="box">
-        <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
-        <Icon name="checkmark" size={14} />
-      </span>
-      <span>{label}</span>
-    </label>
-  );
-}
-
 export function Switch({ label, description, checked, onChange }: { label: string; description?: ReactNode; checked: boolean; onChange: (on: boolean) => void }) {
   const id = useId();
   return (

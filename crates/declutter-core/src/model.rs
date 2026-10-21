@@ -95,12 +95,7 @@ dto! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
-pub enum Phase {
-    Walking,
-    Comparing,
-    Hashing,
-    Similar,
-}
+pub enum Phase { Walking, Comparing, Hashing, Similar }
 
 dto! {
     pub struct Progress {
@@ -135,45 +130,19 @@ dto! {
 #[serde(tag = "type", rename_all = "camelCase")]
 #[ts(export)]
 pub enum ScanEvent {
-    Progress {
-        progress: Progress,
-    },
-    Sort {
-        plan: SortPlan,
-    },
-    LargeOld {
-        files: Vec<FileRef>,
-    },
-    Leftovers {
-        items: Vec<Leftover>,
-    },
-    EmptyDirs {
-        dirs: Vec<String>,
-    },
-    Skipped {
-        folders: Vec<String>,
-    },
-    Breakdown {
-        breakdown: Breakdown,
-    },
-    Duplicates {
-        groups: Vec<DupGroup>,
-    },
-    Redownloads {
-        pairs: Vec<Redownload>,
-    },
-    Similar {
-        groups: Vec<SimilarGroup>,
-    },
+    Progress { progress: Progress },
+    Sort { plan: SortPlan },
+    LargeOld { files: Vec<FileRef> },
+    Leftovers { items: Vec<Leftover> },
+    EmptyDirs { dirs: Vec<String> },
+    Skipped { folders: Vec<String> },
+    Breakdown { breakdown: Breakdown },
+    Duplicates { groups: Vec<DupGroup> },
+    Redownloads { pairs: Vec<Redownload> },
+    Similar { groups: Vec<SimilarGroup> },
     #[serde(rename_all = "camelCase")]
-    Done {
-        cancelled: bool,
-        #[ts(type = "number")]
-        took_ms: u64,
-    },
-    Error {
-        message: String,
-    },
+    Done { cancelled: bool, #[ts(type = "number")] took_ms: u64 },
+    Error { message: String },
 }
 
 dto! {

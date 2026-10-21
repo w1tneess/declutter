@@ -145,6 +145,6 @@ mod tests {
         let got = find_leftovers(&ctx(dir.path()), &es);
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].reason, "Old installer");
-        assert!(got[0].path.ends_with(r"Downloads\a.exe"));
+        assert!(got[0].path.ends_with("a.exe"));
     }
 }

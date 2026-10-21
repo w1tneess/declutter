@@ -106,7 +106,7 @@ impl HashCache {
         let mut v: Vec<_> = self.map.iter().collect();
         if v.len() > cap {
             v.retain(|(k, _)| Path::new(k).exists());
-            v.sort_by(|a, b| b.1.used.cmp(&a.1.used));
+            v.sort_by_key(|(_, r)| std::cmp::Reverse(r.used));
             v.truncate(cap);
         }
         v

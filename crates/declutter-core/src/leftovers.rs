@@ -22,19 +22,19 @@ pub fn find_leftovers(ctx: &Ctx, entries: &[Entry]) -> Vec<Leftover> {
         .platform
         .known_folder(KnownFolder::Downloads)
         .unwrap_or_else(|| ctx.platform.home().join("Downloads"));
-    let dl = path_key(&downloads).trim_end_matches('\\').to_owned();
+    // "Inside Downloads" is a case-insensitive prefix test on the folder plus a separator.
+    let dl = format!("{}\\", path_key(&downloads).trim_end_matches('\\'));
     let mut out = Vec::new();
     for e in entries {
         if ctx.cancelled() {
             return Vec::new();
         }
         let (x, age) = (ext(&e.path), now - e.mtime);
-        let k = path_key(&e.path);
         let reason = if DEAD_EXTS.contains(&x.as_str()) && age > 3.0 * DAY {
             "Unfinished download"
         } else if INSTALLER_EXTS.contains(&x.as_str())
             && age > 7.0 * DAY
-            && k.starts_with(&format!("{dl}\\"))
+            && path_key(&e.path).starts_with(&dl)
         {
             "Old installer"
         } else if x == "zip" && is_extracted(&e.path) {

@@ -42,8 +42,6 @@ jobs:
       # The Tauri shell embeds ui/dist at compile time, so it is checked separately below, once a frontend exists.
       - name: Test (golden fixtures run here; also exports TypeScript bindings)
         run: cargo test --workspace --exclude declutter-shell --locked -- --nocapture
-      - name: Clippy
-        run: cargo clippy --workspace --exclude declutter-shell --all-targets --locked -- -D warnings
       - name: Frontend for the shell (the real UI when present, else a CI-only stand-in page)
         shell: pwsh
         run: |
@@ -54,8 +52,10 @@ jobs:
             New-Item -ItemType Directory -Force ui/dist | Out-Null
             Set-Content ui/dist/index.html '<!doctype html><title>Declutter</title>'
           }
-      - name: Clippy (Tauri shell)
-        run: cargo clippy -p declutter-shell --all-targets --locked -- -D warnings
+      - name: Clippy (app layer and Tauri shell)
+        run: cargo clippy -p declutter-app -p declutter-shell --all-targets --locked -- -D warnings
+      - name: Clippy
+        run: cargo clippy --workspace --exclude declutter-shell --all-targets --locked -- -D warnings
       - name: TypeScript bindings must match the Rust types
         shell: pwsh
         run: |

@@ -19,13 +19,12 @@ export function Sidebar<T extends string>({ items, current, onSelect, footer }: 
           type="button"
           className={`nav-item${on ? ' is-on' : ''}`}
           aria-current={on ? 'page' : undefined}
-          aria-label={it.count ? `${it.label}, ${it.count.toLocaleString('en-US')} found` : undefined}
           title={it.label}
           onClick={() => onSelect(it.id)}
         >
           <Icon name={on ? it.iconOn : it.icon} />
           <span className="nav-label">{it.label}</span>
-          {!!it.count && <span className="nav-count" aria-hidden="true">{it.count > 9999 ? '9999+' : it.count.toLocaleString('en-US')}</span>}
+          {!!it.count && <span className="nav-count">{it.count > 9999 ? '9999+' : it.count.toLocaleString('en-US')}<span className="sr-only"> found</span></span>}
         </button>
       </li>
     );

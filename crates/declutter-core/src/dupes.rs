@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 use crate::ctx::Ctx;
 use crate::hashcache::HashCache;
 use crate::model::{ActionResult, DupGroup, FileRef, Phase, Progress};
-use crate::paths::ATTR_CLOUD_ONLY;
+use crate::paths::{ext_lower, ATTR_CLOUD_ONLY, DEAD_EXTS, SKIP_SORT_EXTS};
 use crate::trash::to_recycle_bin;
 use crate::walk::Entry;
 
@@ -25,19 +25,7 @@ const PARTIAL: usize = 64 * 1024;
 const CHUNK: usize = 1024 * 1024;
 const REPORT_MS: u64 = 50;
 
-/// Shortcuts and config files are never listed as copies, here or as re-downloads.
-pub(crate) const SKIP_EXTS: [&str; 3] = ["lnk", "url", "ini"];
-/// Downloads that, once old, are offered only as leftovers.
-pub(crate) const DEAD_EXTS: [&str; 2] = ["crdownload", "part"];
-
 type Sha = [u8; 32];
-
-/// Lower-cased extension without the dot ("" if none), like Python's `suffix.lower()`.
-pub(crate) fn ext(p: &Path) -> String {
-    p.extension()
-        .map(|e| e.to_string_lossy().to_lowercase())
-        .unwrap_or_default()
-}
 
 /// Windows paths compare case-insensitively and accept either slash, as Python's `Path` equality does.
 pub(crate) fn path_key(p: &Path) -> String {
@@ -64,10 +52,11 @@ pub(crate) fn file_ref(e: &Entry) -> FileRef {
 pub fn find_duplicates(ctx: &Ctx, entries: &[Entry], min_size: u64) -> Vec<DupGroup> {
     let mut by_size: HashMap<u64, Vec<&Entry>> = HashMap::new();
     for e in entries {
-        let x = ext(&e.path);
+        // Shortcuts and config files are never copies; old partial downloads are offered only as leftovers.
+        let x = ext_lower(&e.path);
         if e.size >= min_size
             && e.attrs & ATTR_CLOUD_ONLY == 0
-            && !SKIP_EXTS.contains(&x.as_str())
+            && !SKIP_SORT_EXTS.contains(&x.as_str())
             && !DEAD_EXTS.contains(&x.as_str())
         {
             by_size.entry(e.size).or_default().push(e);

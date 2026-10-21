@@ -8,8 +8,9 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::ctx::Ctx;
-use crate::dupes::{ext, file_ref, name, path_key, SKIP_EXTS};
+use crate::dupes::{file_ref, name, path_key};
 use crate::model::{ActionResult, Redownload};
+use crate::paths::{ext_lower, SKIP_SORT_EXTS};
 use crate::trash::to_recycle_bin;
 use crate::walk::Entry;
 
@@ -28,7 +29,7 @@ fn stem(p: &Path) -> String {
 fn sibling_key(p: &Path, stem: &str) -> (String, String, String) {
     (
         p.parent().map(path_key).unwrap_or_default(),
-        ext(p),
+        ext_lower(p),
         stem.to_lowercase(),
     )
 }
@@ -48,7 +49,7 @@ pub fn find_redownloads(entries: &[Entry], exclude: &[PathBuf]) -> Vec<Redownloa
         };
         if e.size == 0
             || skip.contains(&path_key(&e.path))
-            || SKIP_EXTS.contains(&ext(&e.path).as_str())
+            || SKIP_SORT_EXTS.contains(&ext_lower(&e.path).as_str())
         {
             continue;
         }

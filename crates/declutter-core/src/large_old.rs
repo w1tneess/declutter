@@ -1,8 +1,9 @@
 //! Large and old files. Owner: core-B. See CONTRACT "Large and old". Port of find_large_old.
 
 use crate::ctx::Ctx;
-use crate::dupes::{ext, file_ref, DEAD_EXTS};
+use crate::dupes::file_ref;
 use crate::model::FileRef;
+use crate::paths::{ext_lower, DEAD_EXTS};
 use crate::walk::Entry;
 
 /// size >= min_mb MiB AND older than `older_days`; 0 disables a filter; dead downloads excluded; size descending,
@@ -14,7 +15,7 @@ pub fn find_large_old(ctx: &Ctx, entries: &[Entry], min_mb: f64, older_days: u32
         .filter(|e| {
             !(min_mb > 0.0 && (e.size as f64) < min_mb * 1024.0 * 1024.0)
                 && !(older_days > 0 && e.mtime > cutoff)
-                && !DEAD_EXTS.contains(&ext(&e.path).as_str())
+                && !DEAD_EXTS.contains(&ext_lower(&e.path).as_str())
         })
         .map(file_ref)
         .collect();

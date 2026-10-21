@@ -489,8 +489,14 @@ fn actions_on_a_folder_never_scanned_are_refused() {
     let e = env(FakeEngine::default());
     let root = dto(&e.root);
     let file = dto(&e.root.join("a.txt"));
-    assert!(e.app.trash_paths(&root, &[file.clone()]).is_err());
-    assert!(e.app.trash_empty_dirs(&root, &[file.clone()]).is_err());
+    assert!(e
+        .app
+        .trash_paths(&root, std::slice::from_ref(&file))
+        .is_err());
+    assert!(e
+        .app
+        .trash_empty_dirs(&root, std::slice::from_ref(&file))
+        .is_err());
     let mv = Move {
         src: file.clone(),
         dst: dto(&e.root.join("Other/a.txt")),

@@ -71,6 +71,8 @@ pub struct App {
     scans: Mutex<HashMap<u64, Ctx>>,
     /// Last scan of each folder, keyed by the lower-cased validated root.
     memos: Mutex<HashMap<String, Memo>>,
+    /// Held by every action, so overlapping calls cannot interleave their writes to the undo log or the tally.
+    acting: Mutex<()>,
 }
 
 impl App {
@@ -81,6 +83,7 @@ impl App {
             next_id: AtomicU64::new(1),
             scans: Mutex::default(),
             memos: Mutex::default(),
+            acting: Mutex::default(),
         })
     }
 
@@ -192,13 +195,17 @@ impl App {
         // Saved pins count even when the UI's copy of the list is stale.
         ignore.extend(self.pins(ctx));
         let k = key(dto_path(&root));
-        lock(&self.memos).insert(
-            k.clone(),
-            Memo {
-                scan_id: id,
-                ..Memo::default()
-            },
-        );
+        {
+            // An older scan that reaches this point late must not wipe a newer scan's results.
+            let mut memos = lock(&self.memos);
+            let memo = memos.entry(k.clone()).or_default();
+            if memo.scan_id < id {
+                *memo = Memo {
+                    scan_id: id,
+                    ..Memo::default()
+                };
+            }
+        }
         let record = |ev: ScanEvent| {
             if let Some(m) = lock(&self.memos).get_mut(&k).filter(|m| m.scan_id == id) {
                 m.record(&ev);
@@ -270,6 +277,7 @@ impl App {
         moves: &[Move],
         recent_hours: u32,
     ) -> Result<ActionResult, String> {
+        let _one = lock(&self.acting);
         let ctx = self.ctx();
         let mut errors = Vec::new();
         let (root, planned) = self.scanned(&ctx, root, |m| {
@@ -305,6 +313,7 @@ impl App {
 
     /// Large & Old and Leftovers.
     pub fn trash_paths(&self, root: &str, paths: &[String]) -> Result<ActionResult, String> {
+        let _one = lock(&self.acting);
         let ctx = self.ctx();
         let mut errors = Vec::new();
         let (root, ok) = self.scanned(&ctx, root, |m| offered(paths, &m.files, &mut errors))?;
@@ -315,6 +324,7 @@ impl App {
     }
 
     pub fn trash_empty_dirs(&self, root: &str, paths: &[String]) -> Result<ActionResult, String> {
+        let _one = lock(&self.acting);
         let ctx = self.ctx();
         let mut errors = Vec::new();
         let (root, ok) = self.scanned(&ctx, root, |m| offered(paths, &m.empty, &mut errors))?;
@@ -329,6 +339,7 @@ impl App {
         root: &str,
         removals: &[DupRemoval],
     ) -> Result<ActionResult, String> {
+        let _one = lock(&self.acting);
         let ctx = self.ctx();
         let mut errors = Vec::new();
         let (root, picked) = self.scanned(&ctx, root, |m| {
@@ -373,6 +384,7 @@ impl App {
         pairs: &[Redownload],
         removing: &[String],
     ) -> Result<ActionResult, String> {
+        let _one = lock(&self.acting);
         let ctx = self.ctx();
         let mut errors = Vec::new();
         let (root, known) = self.scanned(&ctx, root, |m| {
@@ -411,6 +423,7 @@ impl App {
         root: &str,
         removals: &[SimilarRemoval],
     ) -> Result<ActionResult, String> {
+        let _one = lock(&self.acting);
         let ctx = self.ctx();
         let mut errors = Vec::new();
         let (root, picked) = self.scanned(&ctx, root, |m| {
@@ -456,6 +469,7 @@ impl App {
     }
 
     pub fn undo_last_sort(&self) -> ActionResult {
+        let _one = lock(&self.acting);
         undo::undo_last(&self.ctx())
     }
 

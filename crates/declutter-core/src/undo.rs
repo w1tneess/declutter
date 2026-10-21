@@ -10,6 +10,7 @@ use crate::ctx::Ctx;
 use crate::model::{ActionResult, Move, UndoInfo};
 use crate::paths::{has_protected_part, unique_path};
 use crate::platform::{local_time_string, move_no_replace, parse_local_time};
+use crate::settings::write_atomic;
 
 const LOG_NAME: &str = "undo.json";
 const MAX_BATCHES: usize = 20;
@@ -41,15 +42,9 @@ fn read_log(ctx: &Ctx) -> Vec<Value> {
     }
 }
 
-/// Temp file + replace, so a crash never leaves a half-written log.
+/// Atomic, so a crash never leaves a half-written log.
 fn write_log(ctx: &Ctx, batches: &[Value]) -> std::io::Result<()> {
-    let path = log_path(ctx);
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, serde_json::to_string_pretty(batches)?)?;
-    std::fs::rename(&tmp, &path)
+    write_atomic(&log_path(ctx), serde_json::to_string_pretty(batches)?.as_bytes())
 }
 
 /// Append one batch of completed moves (called by `sort::apply_moves`).

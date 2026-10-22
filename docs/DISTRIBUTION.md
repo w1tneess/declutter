@@ -142,7 +142,9 @@ releases are unsigned too and fall under the same Smart App Control rule; the sa
   The dry run covers build, bundle and checksums only; the first signed tag is the first test of the rest.
 - **The Tauri build assumptions.** The workflow assumes `@tauri-apps/cli` in `ui/package.json` and `src-tauri/` beside
   `ui/` (`tauri build --no-bundle`, then `tauri bundle --bundles nsis`), and that the build works with
-  `npm ci --ignore-scripts`; none of that exists on this branch yet.
+  `npm ci --ignore-scripts`. `@tauri-apps/cli` is now in `ui/package.json` and `src-tauri/` sits beside `ui/`, but the
+  workflow itself has never run, so these steps (and `--ignore-scripts`, which CI's own `npm ci` does not use) are
+  untested.
 - Prices are those on the pages read on 2026-10-21; CA prices come from reseller pages and are indicative.
 
 ## Sources

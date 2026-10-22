@@ -1,8 +1,40 @@
-# Declutter roadmap (after PR #8)
+# Declutter roadmap
 
 Keep CLAUDE.md short and stable (commands, layout, rules). This file holds the plan. Update it when items finish.
 
-Rules for every item: tests first, core.py stays free of GUI imports, no hex colours outside theme.py, UI pause under 250 ms in tests/gui_check.py, one PR per item.
+Rules for every item: tests first, core.py stays free of GUI imports, no hex colours outside theme.py, UI pause under 250 ms in tests/gui_check.py, one PR per item. (These are the rules for the Python app; the 1.0 rules are in `docs/ARCHITECTURE.md`.)
+
+## Shipped in v0.2.x (Python app, the current release)
+- **v0.2.0** (2026-10-16): themed UI, safety hardening in `core.py`, per-file Sort with undo banner, Never touch list, Likely leftovers and Possible re-downloads, Screenshots/Chat sub-folders, the first+last 64 KB duplicate prefilter, the right-click "Tidy with Declutter" entry, `.lnk`/`.url`/`.ini` never listed as duplicates.
+- **v0.2.1** (2026-10-19): R1 to R5 below: trust cues, local diagnostics log, pin from the Sort row, project and portable-app boundary, UI polish.
+- **v0.2.2** (2026-10-20): the 300-row list-rebuild freeze fix (R5).
+
+## 1.0 rewrite: Rust core + Tauri 2 + React UI (branch `v1-rust`)
+Behaviour is fixed by `docs/CONTRACT.md` and proven by golden fixtures generated from the Python app. The Python app stays as the oracle and the shipping product until 1.0 is released. A beta is planned as v0.3.0 (the workspace version is already 0.3.0).
+
+| | Milestone | Status |
+|---|---|---|
+| M0 | Contract and golden fixtures | Done: `docs/CONTRACT.md`, `tools/gen_golden.py`, `tests/golden/`. The Rust workflow runs them with `GOLDEN_STRICT=1` (every fixture must pass). |
+| M1 | Rust core (`crates/declutter-core`) | Done. Not covered by fixtures, so still unverified on real machines: symlink and junction handling, the real Recycle Bin, OneDrive placeholders, USB and network drives, per-monitor DPI (see the end of `docs/CONTRACT.md`). |
+| M2 | Tauri shell and design system (`crates/declutter-app`, `src-tauri/`, `ui/`) | Done. Never run end to end: the UI has not been run inside the Tauri shell (it is tested in a browser against the mock API). |
+| M3 | Feature parity with v0.2.2 | Screens done. Exit test not run: the R0 hand checks (undo after an app restart, USB and network refusal, OneDrive online-only) on a copy of a messy folder. Not ported yet: the right-click "Tidy with Declutter" entry and opening on a folder given on the command line (the installer config has no entry, the shell ignores arguments other than `--remind`), and the diagnostics log. |
+| M4 | New features | Built: scan ETA and progress, "space freed" tally, "where the space goes" breakdown, CSV export, Recycle Bin size and "Open Recycle Bin", sort presets, scan-only weekly reminder, similar pictures. Follow-ups below. |
+| M5 | Performance gate (`docs/PERF.md`) | Not measured. The `criterion` benches (`walk`, `dupes`) compile in CI (clippy `--all-targets`) but have not been run, and the results table in `docs/PERF.md` is empty. |
+| M6 | Packaging, trust, release | Not verified. The installer has never been built end to end, the `release-v1.yml` signing and attestation jobs have never run, the first signed build is untested on a machine with Smart App Control, and the UI has never been run inside the Tauri shell. The repository has no `SIGNING_PROVIDER` variable and no `release-signing` environment yet, so a tag build would be unsigned (`docs/DISTRIBUTION.md`). |
+
+Decisions needed before the beta:
+- `release-v1.yml` fires only on `v1.*` tags and the Python `release.yml` fires on `v0.*`. A `v0.3.0` tag would build the Python app, not the beta. Either widen the 1.0 workflow's tag filter (and keep the two disjoint) or name the beta `v1.0.0-beta.1`.
+- Signing: apply to SignPath Foundation or set up Azure Artifact Signing (`docs/DISTRIBUTION.md`); without a signature, a machine with Smart App Control refuses to start the app.
+- Website and README install text change at release (the PR that added this section lists the website claims).
+
+### Known follow-ups (1.0)
+- `bin_info` sums sizes through the `trash` crate's listing; folders in the Bin count as items but add no bytes. Use `SHQueryRecycleBinW` behind `Platform` for exact totals (`crates/declutter-app/src/lib.rs`).
+- `trash_paths` and `trash_empty_dirs` pass the caller's spelling of each path on (the scan's stored spelling is used for duplicates and similar groups) and do not check that size and modified time still match what the scan offered. The core re-checks the disk (root, links, left-alone files, emptiness), but a file replaced after the scan is not detected.
+- `export_csv` takes any local-drive path ending in `.csv`; `docs/API.md` says the path comes from the native save dialog, but the shell does not enforce that.
+- The "space freed" tally counts a removed folder as one file (the byte count adds 0 for folders), so "N files" is files plus folders.
+- The `trash` crate deletes with `FOF_ALLOWUNDO | FOF_WANTNUKEWARNING` and no UI, and the code relies on it returning an error instead of destroying an item that cannot go to the Bin. That behaviour on a fixed drive with no Recycle Bin (for example Bin disabled for the drive) is assumed from the crate, not tested.
+- The similar-pictures side-by-side preview is a placeholder: the screen says "Side-by-side previews are coming in a later version" and points to Explorer.
+- Align versions: the Rust workspace is 0.3.0, `ui/package.json` says 1.0.0.
 
 ## R0. Blockers (no new features until these are done)
 - [x] Merge #3 to #8 in order; retarget #8 to main after #7 merges.
@@ -52,5 +84,5 @@ Already in core.py: .git, node_modules, .venv, package.json, *.sln. Add: .svn, .
 
 ## Later, only if real users ask
 - Year-Month sub-folders (opt-in). Risk: moves the mess one level deeper and adds undo cases.
-- Code signing (costs money; test first whether the SmartScreen warning actually stops your testers).
+- Code signing for v0.x (costs money; test first whether the SmartScreen warning actually stops your testers). For 1.0 it is a release gate, see `docs/DISTRIBUTION.md`.
 - Folder watching, auto-update, .rar/.7z extraction check.

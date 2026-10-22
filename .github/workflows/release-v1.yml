@@ -1,6 +1,6 @@
 name: Release v1
 
-# Real releases come ONLY from a v1.* tag push. workflow_dispatch is a dry run: it builds everything and uploads
+# Real releases come ONLY from a v1.* tag push. A push to branch v1-dryrun (or workflow_dispatch) is a dry run: it builds everything and uploads
 # workflow artifacts, but signing, attestation and publishing are skipped.
 # The Python app's releases (tags v0.*) are release.yml; the two tag filters must never overlap.
 #
@@ -11,6 +11,7 @@ name: Release v1
 on:
   push:
     tags: ['v1.*']
+    branches: ['v1-dryrun'] # dry run: every signing and publish job is gated on a v1.* tag ref
   workflow_dispatch:
 
 # Nothing gets more than read access by default; the jobs that need more ask for exactly that.

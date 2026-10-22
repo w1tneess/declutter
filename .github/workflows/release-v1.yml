@@ -61,10 +61,9 @@ jobs:
           npm run build
 
       # Two steps (build, then bundle in another job) so the app exe can be signed before it is packed.
-      # Assumes @tauri-apps/cli is a devDependency of ui/ and src-tauri/ sits beside it.
+      # The CLI is a devDependency of ui/; it is run from the repo root because it looks for tauri.conf.json in subfolders.
       - name: Build the app
-        working-directory: ui
-        run: npx --no-install tauri build --no-bundle
+        run: ui/node_modules/.bin/tauri build --no-bundle
 
       - name: Collect the app exe
         run: |
@@ -151,10 +150,9 @@ jobs:
 
       # Per-user NSIS installer (no admin rights, no UAC), forced here in case tauri.conf.json says otherwise.
       - name: Bundle the NSIS installer
-        working-directory: ui
         run: |
           echo '{"bundle":{"windows":{"nsis":{"installMode":"currentUser"}}}}' > "$RUNNER_TEMP/nsis-user.json"
-          npx --no-install tauri bundle --bundles nsis --config "$RUNNER_TEMP/nsis-user.json"
+          ui/node_modules/.bin/tauri bundle --bundles nsis --config "$RUNNER_TEMP/nsis-user.json"
 
       - name: Installer and portable zip
         env:

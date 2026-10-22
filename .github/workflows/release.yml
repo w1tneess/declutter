@@ -2,7 +2,8 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    # Python app only (v0.*). v1.* tags belong to release-v1.yml; the two filters must never overlap.
+    tags: ["v0.*"]
 
 permissions:
   contents: write

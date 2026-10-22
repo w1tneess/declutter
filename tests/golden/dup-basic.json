@@ -1,0 +1,47 @@
+{
+ "schema": 1,
+ "name": "dup-basic",
+ "description": "Identical content groups together; oldest copy is first (keeper); same size, different content is not a duplicate.",
+ "op": "duplicates",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "a/x.bin",
+    "text": "same content here",
+    "age_s": 777600
+   },
+   {
+    "path": "b/y.bin",
+    "text": "same content here",
+    "age_s": 1728000
+   },
+   {
+    "path": "c/z.bin",
+    "text": "same content here",
+    "age_s": 1296000
+   },
+   {
+    "path": "d/other.bin",
+    "text": "diff content here"
+   },
+   {
+    "path": "e/solo.bin",
+    "text": "unique and alone"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "groups": [
+   {
+    "size": 17,
+    "files": [
+     "b/y.bin",
+     "c/z.bin",
+     "a/x.bin"
+    ]
+   }
+  ]
+ }
+}

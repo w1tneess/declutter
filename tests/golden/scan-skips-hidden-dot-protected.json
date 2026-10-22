@@ -1,0 +1,54 @@
+{
+ "schema": 1,
+ "name": "scan-skips-hidden-dot-protected",
+ "description": "Hidden (dot-name and attribute), protected-name folders and hidden folders are never entered.",
+ "op": "scan",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "a.txt"
+   },
+   {
+    "path": ".dot.txt"
+   },
+   {
+    "path": "hid.txt",
+    "attrs": [
+     "hidden"
+    ]
+   },
+   {
+    "path": "AppData/x.txt"
+   },
+   {
+    "path": "Windows/y.txt"
+   },
+   {
+    "path": "$Recycle.Bin/z.txt"
+   },
+   {
+    "path": "hiddendir/f.txt"
+   },
+   {
+    "path": ".dotdir/g.txt"
+   },
+   {
+    "path": "ok/b.txt"
+   }
+  ],
+  "dirs": [],
+  "dir_attrs": {
+   "hiddendir": [
+    "hidden"
+   ]
+  }
+ },
+ "expected": {
+  "files": [
+   "a.txt",
+   "ok/b.txt"
+  ],
+  "skipped_dirs": []
+ }
+}

@@ -1,0 +1,56 @@
+{
+ "schema": 1,
+ "name": "recycle-guards",
+ "description": "Outside-root, the root itself, missing paths, left-alone files and normal files and folders.",
+ "op": "recycle",
+ "params": {
+  "paths": [
+   "ok.txt",
+   "../outside.txt",
+   ".",
+   "gone.txt",
+   "fresh.txt",
+   "cloud.dat",
+   "dir"
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "ok.txt"
+   },
+   {
+    "path": "fresh.txt",
+    "age_s": 60
+   },
+   {
+    "path": "cloud.dat",
+    "attrs": [
+     "offline"
+    ]
+   },
+   {
+    "path": "dir/inner.txt"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "result": {
+   "count": 2,
+   "errors": [
+    "outside.txt: outside the chosen folder, skipped",
+    "work: outside the chosen folder, skipped",
+    "fresh.txt: still downloading, just changed or online-only, skipped",
+    "cloud.dat: still downloading, just changed or online-only, skipped"
+   ]
+  },
+  "tree": {
+   "files": [
+    "cloud.dat",
+    "fresh.txt"
+   ],
+   "dirs": []
+  }
+ }
+}

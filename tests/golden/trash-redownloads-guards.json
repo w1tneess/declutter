@@ -1,0 +1,78 @@
+{
+ "schema": 1,
+ "name": "trash-redownloads-guards",
+ "description": "A copy is removed only if its original still exists and is not itself being removed.",
+ "op": "trash_redownloads",
+ "params": {
+  "after_scan": [
+   {
+    "do": "delete",
+    "path": "a.pdf"
+   }
+  ],
+  "removing": [
+   "b.pdf"
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a.pdf",
+    "size": 1000
+   },
+   {
+    "path": "a (1).pdf",
+    "size": 1000
+   },
+   {
+    "path": "b.pdf",
+    "size": 2000
+   },
+   {
+    "path": "b (1).pdf",
+    "size": 2000
+   },
+   {
+    "path": "c.pdf",
+    "size": 3000
+   },
+   {
+    "path": "c (1).pdf",
+    "size": 3000
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "pairs": [
+   {
+    "original": "a.pdf",
+    "copy": "a (1).pdf"
+   },
+   {
+    "original": "b.pdf",
+    "copy": "b (1).pdf"
+   },
+   {
+    "original": "c.pdf",
+    "copy": "c (1).pdf"
+   }
+  ],
+  "result": {
+   "count": 1,
+   "errors": [
+    "a (1).pdf: its original a.pdf is not staying, skipped",
+    "b (1).pdf: its original b.pdf is not staying, skipped"
+   ]
+  },
+  "tree": {
+   "files": [
+    "a (1).pdf",
+    "b (1).pdf",
+    "b.pdf",
+    "c.pdf"
+   ],
+   "dirs": []
+  }
+ }
+}

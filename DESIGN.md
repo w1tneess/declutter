@@ -1,57 +1,57 @@
-# Declutter design tokens
+# Declutter design (1.0 UI)
 
-Visual source of truth: the "Declutter UI" canvas (Home dark, Home light, Duplicates, Confirm dialog). Build the app UI to match it. Where this file and the canvas disagree, ask.
+The React UI in `ui/` follows Windows 11 (Fluent) conventions. `ui/src/design/tokens.css` is the only place colours,
+type, spacing, radii, elevation and motion are defined; component styles (`app.css`) and code use the tokens only,
+never a literal colour. The v0.2.2 CustomTkinter palette (`src/declutter/theme.py`) is superseded for 1.0.
 
 ## Themes
-Two themes, dark and light. Default follows the Windows setting (`System`); the user can override in Settings (System, Light, Dark) and the choice is remembered.
-
-CustomTkinter supports this directly: pass `(light, dark)` tuples for every colour and call `customtkinter.set_appearance_mode("system" | "light" | "dark")`. Define all colours once in `theme.py` as `(light, dark)` tuples. No hex values in widget code.
+Light and dark. `System` (default) follows Windows through `prefers-color-scheme`; Settings can force Light or Dark
+(`data-theme` on `<html>`), saved in settings. The dark background is `#202020`, never black.
 
 ## Colour tokens
-
 | Token | Light | Dark | Used for |
 |---|---|---|---|
-| `bg` | `#F3F5F9` | `#0B0F17` | Window background |
-| `surface` | `#FFFFFF` | `#121826` | Sidebar, title bar, cards, inputs |
-| `surface_alt` | `#EEF1F6` | `#161D2D` | Group headers in lists |
-| `border` | `#DFE4EC` | `#232B3B` | Card and panel borders |
-| `border_control` | `#CBD2DE` | `#2E384C` | Button and input borders |
-| `divider` | `#E8ECF2` | `#1C2434` | Row separators in lists |
-| `text` | `#0F1623` | `#E8ECF4` | Primary text |
-| `text_muted` | `#566176` | `#9AA4B5` | Secondary text, descriptions |
-| `text_nav` | `#36415A` | `#B4BDCC` | Inactive nav and text buttons |
-| `accent` | `#2F6FED` | `#2F6FED` | Primary button fill, logo, selected pill |
-| `on_accent` | `#FFFFFF` | `#FFFFFF` | Text on accent fill |
-| `accent_text` | `#1F4FB8` | `#8DB6FF` | Link-style buttons, active nav text |
-| `accent_icon` | `#2F6FED` | `#7DAAFF` | Icons on tinted chips |
-| `accent_soft` | `#E6EEFF` | `#1A2744` | Active nav background, icon chips, "Keep" badge |
+| `bg` | `#F3F3F3` | `#202020` | Window background |
+| `surface` | `#FFFFFF` | `#2B2B2B` | Cards, lists, inputs, dialogs |
+| `surface-alt` | `#F9F9F9` | `#272727` | Sidebar, status bar, group headers |
+| `surface-hover` / `-pressed` | `#F0F0F0` / `#E8E8E8` | `#323232` / `#292929` | Hover and pressed fills |
+| `selected` | `#E6F0FA` | `#19324A` | Ticked rows |
+| `border` | `#E3E3E3` | `#3A3A3A` | Card and divider hairlines (decorative) |
+| `border-control` | `#858585` | `#8F8F8F` | Button, input, checkbox and switch borders (>= 3:1) |
+| `text` / `text-muted` | `#1B1B1B` / `#5C5C5C` | `#FFFFFF` / `#C8C8C8` | Primary and secondary text |
+| `accent` / `on-accent` | `#005FB8` / `#FFFFFF` | `#60CDFF` / `#000000` | Primary button, checked controls, progress |
+| `accent-text` | `#005A9E` | `#8FDCFF` | Links, subtle buttons, summary hints |
+| `danger` / `danger-text` | `#C42B1C` / `#B3261A` | `#FF99A4` / `#FFADB6` | Errors; danger buttons (non-file actions only) |
+| `warning-text`, `success-text` | `#8A5300`, `#0E700E` | `#FCE100`, `#6CCB5F` | "Likely leftover" badge, success |
+| `focus` | `#000000` | `#FFFFFF` | 2 px focus ring |
 
-Notes:
-- Light values for `surface_alt` and `divider` are not drawn on the canvas yet (only Home light exists). They are first guesses. Check them visually.
-- Contrast was estimated by hand, not measured with a tool. White on `#2F6FED` is about 4.5:1, the minimum for normal text. Verify the muted text colours with a contrast checker in both themes before release.
-- Danger or warning colours are not defined yet. Nothing in v1 needs one, because removals go to the Recycle Bin.
+Contrast is measured, not estimated: `ui/src/design/contrast.test.ts` parses `tokens.css` and fails CI if any text pair
+drops below 4.5:1 or a control border, focus ring or accent graphic below 3:1, in either theme. Playwright also runs
+axe (WCAG 2.2 AA, including colour contrast) on Home, Duplicates, Large & old, Empty folders and Settings in both themes.
 
-## Type and shape
-- Font: Segoe UI (Windows system font). Fallback: any default sans.
-- Sizes: page title 28 semibold, card number 34 semibold, body 15, secondary 13.5, nav 14.5.
-- Radius: cards 14, buttons 10, pills 18, nav items 8, dialog 16.
-- Spacing: window padding 32 (vertical) and 40 (horizontal), gap 20 between sections, 16 between cards.
-- Sidebar 232 wide. Window design size 1100 x 720; the app must also work when resized.
-- Icons: simple outline icons, 1.75 stroke, 20 px in nav. No emoji.
+## Type, spacing and shape
+- Font: Segoe UI Variable (Text for body, Display for titles), Segoe UI fallback.
+- Type scale 12 / 13 / 14 / 20 / 32 (caption, small, body, subtitle, title). Nothing else.
+- Spacing on a 4 / 8 grid (`--sp-1` 4 px to `--sp-10` 40 px). Page padding 32 / 40.
+- Radius 4 for controls, 8 for cards and overlays. Controls 36 px high; rows, nav items and main actions 44 px.
+- Icons: Fluent UI System Icons (MIT), 20 px, path data in `icons.ts`; filled variant for the current page. No emoji.
+- Sidebar 248 px; below 720 px it collapses to icons (labels stay as accessible names).
 
-## Behaviour rules the design assumes
-- Scan runs in the background with progress and Cancel. The UI never freezes.
-- Every destructive action shows the confirm dialog with the exact count first.
-- Keep-one rule: in a duplicate group the oldest copy is marked "Keep" and cannot be selected for removal.
-- Real checkboxes and buttons with visible keyboard focus in both themes.
-
-## Apple-style revision
-Palette, radii and flat cards now follow Apple's system look (grouped surfaces, system blue, hairline dividers). `src/declutter/theme.py` is the source of truth for the colour values; the table above is the earlier palette. Cards: 16, dialog: 14, page title 32. Cards and lists have no border; only sidebar and status bar keep a hairline.
-
-Button hierarchy (HIG): one filled accent button per view (Scan on Home, the footer action on each tab, the confirm button in dialogs). Secondary actions (folder shortcuts, Choose folder, Apply, Undo, Cancel) are bordered. Low-emphasis actions (Select all / none) are plain accent text.
-
-Settings page: grouped cards in the style of macOS System Settings (Appearance, Start-up, Large & old files); every change saves at once. The page scrolls, so it still fits at 150% scaling in the minimum window. If the 1100 x 720 design size does not fit the screen (for example 1080p at 150%), the window opens maximised.
-
-Motion (only where it explains a change, all skipped when Windows "Animation effects" is off): window and confirm dialog fade in (~180 ms); Home card numbers count up after a scan (ease-out, ~450 ms); success results are a toast that slides up above the status bar and leaves after ~4.5 s, while results with problems still use a dialog. Disabled filled buttons turn grey (`surface_alt` fill, muted text) so they never read as clickable. Shortcuts: Ctrl+F filter, Ctrl+1–6 pages.
-
-Accent is `#0071E3`, not system blue `#007AFF`: white on `#007AFF` is about 4:1, below 4.5:1 for normal text. Muted text is `#6E6E73` / `#98989D` rather than Apple's translucent secondaryLabel for the same reason. Contrast figures are from published values, not measured in-app.
+## Behaviour the design assumes
+- Every result list is virtualized (`@tanstack/react-virtual`, fixed row heights); 100,000 rows keep a constant DOM.
+- Scans stream results per phase; each tab says "Looking for ..." until its part arrives. The status bar shows the
+  phase label, a progress bar that turns determinate once the total is known, an ETA ("About 2 minutes left") once
+  hashing has a rate, and Cancel.
+- First run: Home shows a drop zone with Downloads, Desktop, Documents and "Choose folder". Each tab without results
+  points back to Home; an empty result says "Nothing to clean. Nice."
+- Safety (SPEC rules 1, 2, 3, 6): nothing changes without a confirm dialog that states the exact count; removals say
+  they go to the Recycle Bin and can be restored there; Sort shows "Undo last sort". Only moves (undoable) and empty
+  folders start ticked; duplicates, re-downloads, similar pictures, large and leftover files never do. A duplicate
+  group's keeper cannot be ticked, and a selection that would remove every copy is refused.
+- Button hierarchy: one filled accent button per view (Scan, the footer action, the dialog's confirm). Secondary
+  actions are bordered; Select all / none are subtle text buttons.
+- Keyboard: everything is reachable with Tab. Lists are listboxes: arrows, Home/End, PageUp/PageDown move, Space
+  ticks, Ctrl+A selects all, Enter shows details, K keeps a duplicate. Ctrl+1-7 switch pages, Ctrl+F focuses the
+  filter. Dialogs trap focus, close on Esc and return focus. Tooltips close on Esc.
+- Motion: Fluent durations (83 / 167 / 250 ms); all zero under `prefers-reduced-motion`.
+- Results: success is a toast (about 4.5 s); results with problems open a dialog listing them.

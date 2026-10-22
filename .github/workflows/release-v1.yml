@@ -47,7 +47,7 @@ jobs:
         run: |
           version=$(tr -d '\r' < Cargo.toml | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
           [ -n "$version" ] || { echo "no version in Cargo.toml"; exit 1; }
-          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
             echo "Tag $GITHUB_REF_NAME does not match Cargo.toml version $version"; exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,65 @@
+{
+ "schema": 1,
+ "name": "scan-leave-alone",
+ "description": "Active downloads, files changed in the last 5 minutes and online-only placeholders are left alone; old dead downloads are not.",
+ "op": "scan",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "fresh.txt",
+    "age_s": 60
+   },
+   {
+    "path": "recent4.txt",
+    "age_s": 240
+   },
+   {
+    "path": "older6.txt",
+    "age_s": 400
+   },
+   {
+    "path": "dead.crdownload",
+    "age_s": 864000
+   },
+   {
+    "path": "young.part",
+    "age_s": 172800
+   },
+   {
+    "path": "any.tmp",
+    "age_s": 864000
+   },
+   {
+    "path": "x.opdownload",
+    "age_s": 864000
+   },
+   {
+    "path": "y.download",
+    "age_s": 864000
+   },
+   {
+    "path": "z.!qB",
+    "age_s": 864000
+   },
+   {
+    "path": "cloud.docx",
+    "attrs": [
+     "offline"
+    ]
+   },
+   {
+    "path": "old.txt"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "files": [
+   "dead.crdownload",
+   "old.txt",
+   "older6.txt"
+  ],
+  "skipped_dirs": []
+ }
+}

@@ -1,0 +1,66 @@
+{
+ "schema": 1,
+ "name": "scan-project-and-app-folders",
+ "description": "Project folders (.git, package.json, *.sln) and portable-app folders (.exe + .dll) below the root are skipped and reported.",
+ "op": "scan",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "loose.txt"
+   },
+   {
+    "path": "proj/code.py"
+   },
+   {
+    "path": "proj2/package.json"
+   },
+   {
+    "path": "proj2/a.js"
+   },
+   {
+    "path": "slnproj/x.sln"
+   },
+   {
+    "path": "slnproj/c.cs"
+   },
+   {
+    "path": "app/tool.exe"
+   },
+   {
+    "path": "app/lib.dll"
+   },
+   {
+    "path": "app/readme.txt"
+   },
+   {
+    "path": "exeonly/tool.exe"
+   },
+   {
+    "path": "exeonly/readme.txt"
+   },
+   {
+    "path": "sub/ok.txt"
+   }
+  ],
+  "dirs": [
+   "proj/.git",
+   "mixed/.venv"
+  ]
+ },
+ "expected": {
+  "files": [
+   "exeonly/readme.txt",
+   "exeonly/tool.exe",
+   "loose.txt",
+   "sub/ok.txt"
+  ],
+  "skipped_dirs": [
+   "app",
+   "mixed",
+   "proj",
+   "proj2",
+   "slnproj"
+  ]
+ }
+}

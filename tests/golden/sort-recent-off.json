@@ -1,0 +1,44 @@
+{
+ "schema": 1,
+ "name": "sort-recent-off",
+ "description": "recent_hours 0 moves everything that is not in the 5-minute or active-download rules.",
+ "op": "plan_sort",
+ "params": {
+  "recent_hours": 0
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "fresh2h.txt",
+    "age_s": 7200
+   },
+   {
+    "path": "copy.txt",
+    "age_s": 864000,
+    "created_age_s": 3600
+   },
+   {
+    "path": "fresh1m.txt",
+    "age_s": 60
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "moves": [
+   {
+    "src": "copy.txt",
+    "dst": "Documents/copy.txt",
+    "size": 10,
+    "category": "Documents"
+   },
+   {
+    "src": "fresh2h.txt",
+    "dst": "Documents/fresh2h.txt",
+    "size": 10,
+    "category": "Documents"
+   }
+  ],
+  "recent_left": 0
+ }
+}

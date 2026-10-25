@@ -1,0 +1,24 @@
+[package]
+name = "declutter-shell"
+description = "Declutter desktop app: the Tauri 2 shell around declutter-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "declutter"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+declutter-app = { version = "0.3.0", path = "../crates/declutter-app" }
+declutter-core = { version = "0.3.0", path = "../crates/declutter-core" }
+tauri = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2"
+window-vibrancy = "0.8.1"

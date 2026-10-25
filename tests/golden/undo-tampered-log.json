@@ -1,0 +1,79 @@
+{
+ "schema": 1,
+ "name": "undo-tampered-log",
+ "description": "A hand-edited log: protected location refused, damaged entry reported, good entry restored.",
+ "op": "undo",
+ "params": {
+  "raw_log": [
+   {
+    "time": "2026-01-01 10:00:00",
+    "moves": [
+     {
+      "src": "<root>\\good.pdf",
+      "dst": "<root>\\Documents\\good.pdf"
+     },
+     {
+      "src": "<root>\\x.txt"
+     },
+     {
+      "src": "C:\\Windows\\sys.dll",
+      "dst": "C:\\Windows\\other.dll"
+     }
+    ]
+   }
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "Documents/good.pdf",
+    "text": "good"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "log_after_apply": [
+   {
+    "moves": [
+     {
+      "src": "good.pdf",
+      "dst": "Documents/good.pdf"
+     },
+     {
+      "src": "x.txt"
+     },
+     {
+      "src": "C:\\Windows\\sys.dll",
+      "dst": "C:\\Windows\\other.dll"
+     }
+    ],
+    "time_is_timestamp": true
+   }
+  ],
+  "tree_after_apply": {
+   "files": [
+    "Documents/good.pdf"
+   ],
+   "dirs": [
+    "Documents"
+   ]
+  },
+  "can_undo": true,
+  "undo_count": 3,
+  "undo": {
+   "count": 1,
+   "errors": [
+    "other.dll: location not allowed, skipped",
+    "Skipped a damaged log entry."
+   ]
+  },
+  "tree_after_undo": {
+   "files": [
+    "good.pdf"
+   ],
+   "dirs": []
+  },
+  "log_len_after_undo": 0
+ }
+}

@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+tone_instructions: >-
+  Be direct and specific. Prefer the smallest change that fully solves the problem: flag speculative abstraction,
+  unused options, wrappers and boilerplate nobody asked for. Safety findings come first.
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: true
+    # 1.0 work happens on v1* branches; agent branches are reviewed as PRs into v1-rust.
+    base_branches:
+      - main
+      - 'v1.*'
+  path_filters:
+    - '!tests/golden/*.json'
+    - '!Cargo.lock'
+    - '!**/package-lock.json'
+    - '!ui/src/api/generated/**'
+  path_instructions:
+    - path: 'crates/declutter-core/**'
+      instructions: |
+        This is a file-cleanup tool: a bug here can destroy a user's files. Check against SPEC.md rules 1-11 and
+        docs/CONTRACT.md first.
+        - Nothing may ever be deleted permanently; removals go through Platform::recycle (Recycle Bin) only.
+        - Every action re-checks the disk right before touching a file; one failing item never aborts a batch.
+        - No panics on user data (vanishing, locked, hidden, unreadable files are normal): flag unwrap/expect/indexing.
+        - Windows calls live only in platform.rs; every unsafe block needs a // SAFETY: comment.
+        - Behaviour must match the Python oracle (tests/golden). Flag any deviation from the contract.
+        - Long loops must honour ctx.cancelled() and report progress.
+    - path: 'crates/declutter-app/**'
+      instructions: |
+        Orchestration layer. Validate every path against the scanned root, never trust the UI's copy of a result,
+        never act without the core's own re-check, return plain-language errors. No network access.
+    - path: 'src-tauri/**'
+      instructions: |
+        Tauri shell. Capabilities must be minimal (no shell, fs or http), CSP strict with no remote content or eval,
+        fixed arguments only for anything that launches a process (explorer, schtasks). No telemetry.
+    - path: 'ui/**'
+      instructions: |
+        Review for WCAG 2.2 AA (keyboard operation, visible focus, contrast, labels, reduced motion), performance
+        (virtualized lists, no whole-list re-render per row change, nothing heavy on the main thread), and design-token
+        use (no magic colours/sizes). No dangerouslySetInnerHTML, no network calls, no secrets. Prefer the simplest
+        component that works over new abstractions.
+    - path: '.github/workflows/**'
+      instructions: |
+        Every third-party action pinned to a full commit SHA, least-privilege permissions, nothing that can publish a
+        release from a branch push, no secrets echoed. A real release happens only on a v1.* tag.
+    - path: 'tools/gen_golden.py'
+      instructions: |
+        Generates the golden fixtures from the Python oracle. Fixtures must stay deterministic and avoid tie orders the
+        oracle leaves unspecified.
+  tools:
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+
+chat:
+  auto_reply: true

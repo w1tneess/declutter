@@ -1,0 +1,40 @@
+{
+ "schema": 1,
+ "name": "scan-pinned-never-touch",
+ "description": "Pinned files and folders (Never Touch) are skipped, with everything inside a pinned folder.",
+ "op": "scan",
+ "params": {
+  "ignore": [
+   "pinned.txt",
+   "Keep",
+   "sub/Keep2"
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "pinned.txt"
+   },
+   {
+    "path": "Keep/inside.txt"
+   },
+   {
+    "path": "free.txt"
+   },
+   {
+    "path": "sub/Keep2/deep.txt"
+   },
+   {
+    "path": "sub/also.txt"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "files": [
+   "free.txt",
+   "sub/also.txt"
+  ],
+  "skipped_dirs": []
+ }
+}

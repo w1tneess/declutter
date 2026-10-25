@@ -1,0 +1,75 @@
+name: Rust
+
+# The Rust core and the Tauri shell for 1.0 (branch family v1*). The Python app keeps its own ci.yml.
+on:
+  push:
+    branches: ['v1**']
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'src-tauri/**'
+      - 'Cargo.*'
+      - '.cargo/**'
+      - 'tests/golden/**'
+      - '.github/workflows/rust.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  core:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: rust-${{ runner.os }}-
+      # The Tauri shell embeds ui/dist at compile time, so it is checked separately below, once a frontend exists.
+      - name: Test (golden fixtures run here; also exports TypeScript bindings)
+        env:
+          GOLDEN_STRICT: '1' # every oracle fixture must pass; none may stay pending
+        run: cargo test --workspace --exclude declutter-shell --locked -- --nocapture
+      - name: Frontend for the shell (the real UI when present, else a CI-only stand-in page)
+        shell: pwsh
+        run: |
+          if (Test-Path ui/package.json) {
+            npm ci --prefix ui
+            npm run build --prefix ui
+          } else {
+            New-Item -ItemType Directory -Force ui/dist | Out-Null
+            Set-Content ui/dist/index.html '<!doctype html><title>Declutter</title>'
+          }
+      - name: Clippy (app layer and Tauri shell)
+        run: cargo clippy -p declutter-app -p declutter-shell --all-targets --locked -- -D warnings
+      - name: Clippy
+        run: cargo clippy --workspace --exclude declutter-shell --all-targets --locked -- -D warnings
+      - name: TypeScript bindings must match the Rust types
+        shell: pwsh
+        run: |
+          if ((git ls-files ui/src/api/generated | Measure-Object).Count -gt 0) {
+            git add -N ui/src/api/generated
+            git diff --exit-code -- ui/src/api/generated
+          } else {
+            Write-Host 'bindings not committed yet'
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ts-bindings
+          path: ui/src/api/generated
+          if-no-files-found: warn

@@ -162,15 +162,15 @@ jobs:
           exes=(target/release/*.exe)
           [ "${#installers[@]}" -eq 1 ] || { echo "expected one installer, found: ${installers[*]}"; exit 1; }
           [ "${#exes[@]}" -eq 1 ] || { echo "expected one exe, found: ${exes[*]}"; exit 1; }
-          mkdir installer
-          cp "${installers[0]}" installer/
-          powershell -NoProfile -Command "Compress-Archive -Path '${exes[0]}' -DestinationPath 'installer/Declutter_${VERSION}_x64-portable.zip'"
-          ls -l installer
+          mkdir release
+          cp "${installers[0]}" release/
+          powershell -NoProfile -Command "Compress-Archive -Path '${exes[0]}' -DestinationPath 'release/Declutter_${VERSION}_x64-portable.zip'"
+          ls -l release
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: installer
-          path: installer/*
+          path: release/*
           if-no-files-found: error
           retention-days: 7
 
@@ -180,7 +180,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: installer-setup
-          path: installer/*-setup.exe
+          path: release/*-setup.exe
           if-no-files-found: error
           retention-days: 7
 

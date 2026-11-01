@@ -6,7 +6,7 @@ Windows desktop app that declutters a messy folder safely. Full spec: `SPEC.md` 
 - Tests: `python -m pytest -q` (config in `pytest.ini`; temp dirs go to `.pytest_tmp/`)
 - Mutation check (after changing rules in `core.py`): `python tools/mutation_check.py`; it must print `all caught`
 - Run: `python -m declutter` from `src/` (or set `PYTHONPATH=src`)
-- Deps: `requirements.txt` (runtime), `requirements-dev.txt` (tests + PyInstaller)
+- Deps: edit `requirements.in` (runtime) / `requirements-dev.in` (tests + PyInstaller); `requirements.txt` and `requirements-dev.txt` are generated hash-pinned locks, installed with `pip install --require-hashes -r requirements-dev.txt`. Regenerate with the `pip-compile` commands in `requirements-dev.in`.
 
 ## Layout
 - `src/declutter/core.py` has all file logic, no GUI imports. Test it, don't trust it.

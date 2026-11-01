@@ -1,0 +1,10 @@
+# Test and build dependencies. requirements.txt / requirements-dev.txt are generated, hash-pinned locks:
+# edit the .in files, then regenerate both on Windows with Python 3.12 (what CI and the release build use):
+#   pip install pip-tools
+#   pip-compile --generate-hashes --allow-unsafe --output-file requirements.txt requirements.in
+#   pip-compile --generate-hashes --allow-unsafe --output-file requirements-dev.txt requirements-dev.in
+# Add --uploaded-prior-to <ISO date> (pip >= 26) to stay clear of just-published releases.
+-c requirements.txt
+-r requirements.in
+pytest
+pyinstaller

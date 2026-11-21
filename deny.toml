@@ -1,0 +1,39 @@
+# Policy for `cargo deny check` (run by .github/workflows/audit.yml). Owner: release.
+
+[graph]
+# The app ships for Windows only; ignore crates that only exist on other targets.
+targets = ["x86_64-pc-windows-msvc"]
+
+[advisories]
+# A vulnerability always fails the check. Unmaintained notices fail only for crates we depend on directly:
+# transitive ones (mostly inside Tauri) are not ours to fix and would block every unrelated change.
+unmaintained = "workspace"
+yanked = "deny"
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "Zlib",
+    "CC0-1.0",
+    "0BSD",
+    "bzip2-1.0.6", # libbz2-rs-sys, pulled in by zip
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true # workspace path dependencies carry no version
+
+[sources]
+# crates.io only: no git dependencies, no other registries.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

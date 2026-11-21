@@ -1,0 +1,91 @@
+{
+ "schema": 1,
+ "name": "check-dup-selection",
+ "description": "Selecting every copy of a group is refused; leaving one is fine.",
+ "op": "check_dup_selection",
+ "params": {
+  "selections": [
+   [
+    "g1a.bin"
+   ],
+   [
+    "g1a.bin",
+    "g1b.bin"
+   ],
+   [
+    "g1a.bin",
+    "g2a.bin"
+   ],
+   [
+    "g1a.bin",
+    "g1b.bin",
+    "g2a.bin",
+    "g2b.bin"
+   ],
+   []
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "g1a.bin",
+    "text": "GROUPONE"
+   },
+   {
+    "path": "g1b.bin",
+    "text": "GROUPONE"
+   },
+   {
+    "path": "g2a.bin",
+    "text": "GROUPTWO!"
+   },
+   {
+    "path": "g2b.bin",
+    "text": "GROUPTWO!"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "results": [
+   {
+    "selection": [
+     "g1a.bin"
+    ],
+    "raises": false,
+    "message": ""
+   },
+   {
+    "selection": [
+     "g1a.bin",
+     "g1b.bin"
+    ],
+    "raises": true,
+    "message": "All 2 copies of g1a.bin are selected. Keep at least one."
+   },
+   {
+    "selection": [
+     "g1a.bin",
+     "g2a.bin"
+    ],
+    "raises": false,
+    "message": ""
+   },
+   {
+    "selection": [
+     "g1a.bin",
+     "g1b.bin",
+     "g2a.bin",
+     "g2b.bin"
+    ],
+    "raises": true,
+    "message": "All 2 copies of g2a.bin are selected. Keep at least one."
+   },
+   {
+    "selection": [],
+    "raises": false,
+    "message": ""
+   }
+  ]
+ }
+}

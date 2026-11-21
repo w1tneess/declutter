@@ -1,0 +1,77 @@
+{
+ "schema": 1,
+ "name": "dup-small-files",
+ "description": "Files up to 128 KiB are fully covered by the ends pass; a one-byte difference splits the group.",
+ "op": "duplicates",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "s/a.txt",
+    "segments": [
+     [
+      "A",
+      100000
+     ]
+    ],
+    "age_s": 950400
+   },
+   {
+    "path": "s/b.txt",
+    "segments": [
+     [
+      "A",
+      100000
+     ]
+    ],
+    "age_s": 1036800
+   },
+   {
+    "path": "s/c.txt",
+    "segments": [
+     [
+      "A",
+      99999
+     ],
+     [
+      "B",
+      1
+     ]
+    ]
+   },
+   {
+    "path": "s/d.txt",
+    "segments": [
+     [
+      "A",
+      99999
+     ],
+     [
+      "B",
+      1
+     ]
+    ],
+    "age_s": 1123200
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "groups": [
+   {
+    "size": 100000,
+    "files": [
+     "s/b.txt",
+     "s/a.txt"
+    ]
+   },
+   {
+    "size": 100000,
+    "files": [
+     "s/d.txt",
+     "s/c.txt"
+    ]
+   }
+  ]
+ }
+}

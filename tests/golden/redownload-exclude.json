@@ -1,0 +1,42 @@
+{
+ "schema": 1,
+ "name": "redownload-exclude",
+ "description": "Copies that are identical-content duplicates are passed as exclude and skipped.",
+ "op": "redownloads",
+ "params": {
+  "exclude": [
+   "a (1).bin"
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a.bin",
+    "size": 1000
+   },
+   {
+    "path": "a (1).bin",
+    "size": 1000
+   },
+   {
+    "path": "b.bin",
+    "size": 2000
+   },
+   {
+    "path": "b (1).bin",
+    "size": 2000
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "pairs": [
+   {
+    "original": "b.bin",
+    "copy": "b (1).bin",
+    "orig_size": 2000,
+    "copy_size": 2000
+   }
+  ]
+ }
+}

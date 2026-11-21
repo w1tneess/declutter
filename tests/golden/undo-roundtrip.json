@@ -1,0 +1,99 @@
+{
+ "schema": 1,
+ "name": "undo-roundtrip",
+ "description": "Apply a sort, check the log, undo: files return and empty category folders disappear.",
+ "op": "undo",
+ "params": {
+  "rounds": 1
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a.png",
+    "size": 5
+   },
+   {
+    "path": "b.pdf",
+    "size": 6
+   },
+   {
+    "path": "c.mp3",
+    "size": 7
+   },
+   {
+    "path": "Screenshot 1.png",
+    "size": 8
+   },
+   {
+    "path": "sub/keep.txt"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "applies": [
+   {
+    "count": 4,
+    "errors": []
+   }
+  ],
+  "log_after_apply": [
+   {
+    "moves": [
+     {
+      "src": "Screenshot 1.png",
+      "dst": "Images/Screenshots/Screenshot 1.png"
+     },
+     {
+      "src": "a.png",
+      "dst": "Images/a.png"
+     },
+     {
+      "src": "b.pdf",
+      "dst": "Documents/b.pdf"
+     },
+     {
+      "src": "c.mp3",
+      "dst": "Audio/c.mp3"
+     }
+    ],
+    "time_is_timestamp": true
+   }
+  ],
+  "tree_after_apply": {
+   "files": [
+    "Audio/c.mp3",
+    "Documents/b.pdf",
+    "Images/Screenshots/Screenshot 1.png",
+    "Images/a.png",
+    "sub/keep.txt"
+   ],
+   "dirs": [
+    "Audio",
+    "Documents",
+    "Images",
+    "Images/Screenshots",
+    "sub"
+   ]
+  },
+  "can_undo": true,
+  "undo_count": 4,
+  "undo": {
+   "count": 4,
+   "errors": []
+  },
+  "tree_after_undo": {
+   "files": [
+    "Screenshot 1.png",
+    "a.png",
+    "b.pdf",
+    "c.mp3",
+    "sub/keep.txt"
+   ],
+   "dirs": [
+    "sub"
+   ]
+  },
+  "log_len_after_undo": 0
+ }
+}

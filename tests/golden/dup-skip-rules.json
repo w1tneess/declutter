@@ -1,0 +1,77 @@
+{
+ "schema": 1,
+ "name": "dup-skip-rules",
+ "description": ".lnk/.ini, dead downloads, online-only files and empty files are never listed as duplicates.",
+ "op": "duplicates",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "a.lnk",
+    "text": "link!"
+   },
+   {
+    "path": "b.lnk",
+    "text": "link!"
+   },
+   {
+    "path": "a.ini",
+    "text": "conf"
+   },
+   {
+    "path": "b.ini",
+    "text": "conf"
+   },
+   {
+    "path": "a.crdownload",
+    "text": "partial"
+   },
+   {
+    "path": "b.crdownload",
+    "text": "partial"
+   },
+   {
+    "path": "c1.dat",
+    "text": "cloud!",
+    "attrs": [
+     "offline"
+    ]
+   },
+   {
+    "path": "c2.dat",
+    "text": "cloud!",
+    "attrs": [
+     "offline"
+    ]
+   },
+   {
+    "path": "e1.txt",
+    "text": ""
+   },
+   {
+    "path": "e2.txt",
+    "text": ""
+   },
+   {
+    "path": "n1.txt",
+    "text": "normal dup"
+   },
+   {
+    "path": "n2.txt",
+    "text": "normal dup"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "groups": [
+   {
+    "size": 10,
+    "files": [
+     "n1.txt",
+     "n2.txt"
+    ]
+   }
+  ]
+ }
+}

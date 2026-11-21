@@ -1,0 +1,102 @@
+{
+ "schema": 1,
+ "name": "trash-duplicates-guards",
+ "description": "Removes copies only where an intact kept copy still exists; refuses a group with no keeper left.",
+ "op": "trash_duplicates",
+ "params": {
+  "remove": [
+   [
+    0,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    1,
+    [
+     0
+    ]
+   ],
+   [
+    2,
+    [
+     1
+    ]
+   ]
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a1.bin",
+    "text": "AAAA11",
+    "age_s": 1036800
+   },
+   {
+    "path": "a2.bin",
+    "text": "AAAA11",
+    "age_s": 950400
+   },
+   {
+    "path": "a3.bin",
+    "text": "AAAA11",
+    "age_s": 864000
+   },
+   {
+    "path": "b1.bin",
+    "text": "BBBBBBBBBB",
+    "age_s": 1036800
+   },
+   {
+    "path": "b2.bin",
+    "text": "BBBBBBBBBB",
+    "age_s": 950400
+   },
+   {
+    "path": "c1.bin",
+    "text": "CCCCCCCCCCCCCCCC",
+    "age_s": 1036800
+   },
+   {
+    "path": "c2.bin",
+    "text": "CCCCCCCCCCCCCCCC",
+    "age_s": 950400
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "groups": [
+   [
+    "c1.bin",
+    "c2.bin"
+   ],
+   [
+    "a1.bin",
+    "a2.bin",
+    "a3.bin"
+   ],
+   [
+    "b1.bin",
+    "b2.bin"
+   ]
+  ],
+  "result": {
+   "count": 2,
+   "errors": [
+    "c1.bin: no intact copy would remain, skipped"
+   ]
+  },
+  "tree": {
+   "files": [
+    "a2.bin",
+    "a3.bin",
+    "b1.bin",
+    "c1.bin",
+    "c2.bin"
+   ],
+   "dirs": []
+  }
+ }
+}

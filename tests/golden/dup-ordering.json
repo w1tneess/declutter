@@ -1,0 +1,108 @@
+{
+ "schema": 1,
+ "name": "dup-ordering",
+ "description": "Groups sort by reclaimable size (size x copies-1) descending; equal mtimes break by path.",
+ "op": "duplicates",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "small/s1.bin",
+    "segments": [
+     [
+      "S",
+      100
+     ]
+    ],
+    "age_s": 1036800
+   },
+   {
+    "path": "small/s2.bin",
+    "segments": [
+     [
+      "S",
+      100
+     ]
+    ],
+    "age_s": 950400
+   },
+   {
+    "path": "mid/m1.bin",
+    "segments": [
+     [
+      "M",
+      5000
+     ]
+    ],
+    "age_s": 1036800
+   },
+   {
+    "path": "mid/m2.bin",
+    "segments": [
+     [
+      "M",
+      5000
+     ]
+    ],
+    "age_s": 950400
+   },
+   {
+    "path": "mid/m3.bin",
+    "segments": [
+     [
+      "M",
+      5000
+     ]
+    ],
+    "age_s": 864000
+   },
+   {
+    "path": "tie/b.bin",
+    "segments": [
+     [
+      "T",
+      700
+     ]
+    ],
+    "age_s": 1209600
+   },
+   {
+    "path": "tie/a.bin",
+    "segments": [
+     [
+      "T",
+      700
+     ]
+    ],
+    "age_s": 1209600
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "groups": [
+   {
+    "size": 5000,
+    "files": [
+     "mid/m1.bin",
+     "mid/m2.bin",
+     "mid/m3.bin"
+    ]
+   },
+   {
+    "size": 700,
+    "files": [
+     "tie/a.bin",
+     "tie/b.bin"
+    ]
+   },
+   {
+    "size": 100,
+    "files": [
+     "small/s1.bin",
+     "small/s2.bin"
+    ]
+   }
+  ]
+ }
+}

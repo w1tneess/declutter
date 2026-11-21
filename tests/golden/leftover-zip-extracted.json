@@ -1,0 +1,97 @@
+{
+ "schema": 1,
+ "name": "leftover-zip-extracted",
+ "description": "A zip counts as unpacked only when the same-named folder beside it holds every file at its stored size.",
+ "op": "leftovers",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "good.zip",
+    "zip": {
+     "a.txt": "hello",
+     "sub/b.txt": "world!"
+    }
+   },
+   {
+    "path": "good/a.txt",
+    "text": "hello"
+   },
+   {
+    "path": "good/sub/b.txt",
+    "text": "world!"
+   },
+   {
+    "path": "missing.zip",
+    "zip": {
+     "a.txt": "hello",
+     "b.txt": "x"
+    }
+   },
+   {
+    "path": "missing/a.txt",
+    "text": "hello"
+   },
+   {
+    "path": "wrongsize.zip",
+    "zip": {
+     "a.txt": "hello"
+    }
+   },
+   {
+    "path": "wrongsize/a.txt",
+    "text": "hello!!"
+   },
+   {
+    "path": "slip.zip",
+    "zip": {
+     "../evil.txt": "bad"
+    }
+   },
+   {
+    "path": "slip/ok.txt",
+    "text": "x"
+   },
+   {
+    "path": "evil.txt",
+    "text": "bad"
+   },
+   {
+    "path": "empty.zip",
+    "zip": {}
+   },
+   {
+    "path": "empty/x.txt",
+    "text": "x"
+   },
+   {
+    "path": "corrupt.zip",
+    "corrupt": true
+   },
+   {
+    "path": "corrupt/x.txt",
+    "text": "x"
+   },
+   {
+    "path": "nofolder.zip",
+    "zip": {
+     "a.txt": "hello"
+    }
+   },
+   {
+    "path": "elsewhere/nofolder/a.txt",
+    "text": "hello"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "items": [
+   {
+    "path": "good.zip",
+    "size": 213,
+    "reason": "Unpacked .zip"
+   }
+  ]
+ }
+}

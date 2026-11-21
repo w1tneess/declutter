@@ -1,0 +1,112 @@
+{
+ "schema": 1,
+ "name": "redownload-pairs",
+ "description": "'name (N).ext' and 'name - Copy[ (N)].ext' beside the original, same type, size within 2 %.",
+ "op": "redownloads",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "report.pdf",
+    "size": 1000
+   },
+   {
+    "path": "report (1).pdf",
+    "size": 1010
+   },
+   {
+    "path": "photo.jpg",
+    "size": 5000
+   },
+   {
+    "path": "photo - Copy.jpg",
+    "size": 5000
+   },
+   {
+    "path": "photo - Copy (2).jpg",
+    "size": 4950
+   },
+   {
+    "path": "far.zip",
+    "size": 1000
+   },
+   {
+    "path": "far (1).zip",
+    "size": 1100
+   },
+   {
+    "path": "zero.txt",
+    "size": 10
+   },
+   {
+    "path": "zero (1).txt",
+    "text": ""
+   },
+   {
+    "path": "Doc.PDF",
+    "size": 2000
+   },
+   {
+    "path": "doc (1).pdf",
+    "size": 2000
+   },
+   {
+    "path": "a.lnk",
+    "size": 50
+   },
+   {
+    "path": "a (1).lnk",
+    "size": 50
+   },
+   {
+    "path": "x/note.txt",
+    "size": 300
+   },
+   {
+    "path": "y/note (1).txt",
+    "size": 300
+   },
+   {
+    "path": "lonely (1).txt",
+    "size": 300
+   },
+   {
+    "path": "typed.png",
+    "size": 400
+   },
+   {
+    "path": "typed (1).jpg",
+    "size": 400
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "pairs": [
+   {
+    "original": "Doc.PDF",
+    "copy": "doc (1).pdf",
+    "orig_size": 2000,
+    "copy_size": 2000
+   },
+   {
+    "original": "photo.jpg",
+    "copy": "photo - Copy (2).jpg",
+    "orig_size": 5000,
+    "copy_size": 4950
+   },
+   {
+    "original": "photo.jpg",
+    "copy": "photo - Copy.jpg",
+    "orig_size": 5000,
+    "copy_size": 5000
+   },
+   {
+    "original": "report.pdf",
+    "copy": "report (1).pdf",
+    "orig_size": 1000,
+    "copy_size": 1010
+   }
+  ]
+ }
+}

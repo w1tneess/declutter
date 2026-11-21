@@ -1,0 +1,57 @@
+{
+ "schema": 1,
+ "name": "large-old-both",
+ "description": "Filter size >= 1 MB AND older than 30 days; sorted by size descending; dead downloads excluded.",
+ "op": "large_old",
+ "params": {
+  "min_mb": 1,
+  "older_days": 30
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "big_new.bin",
+    "size": 2098152,
+    "age_s": 86400
+   },
+   {
+    "path": "big_old.bin",
+    "size": 3145728,
+    "age_s": 3456000
+   },
+   {
+    "path": "small_old.bin",
+    "size": 2000,
+    "age_s": 5184000
+   },
+   {
+    "path": "small_new.bin",
+    "size": 1000,
+    "age_s": 86400
+   },
+   {
+    "path": "mid_old.bin",
+    "size": 1048581,
+    "age_s": 3024000
+   },
+   {
+    "path": "dead.crdownload",
+    "size": 4194304,
+    "age_s": 1728000
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "files": [
+   {
+    "path": "big_old.bin",
+    "size": 3145728
+   },
+   {
+    "path": "mid_old.bin",
+    "size": 1048581
+   }
+  ]
+ }
+}

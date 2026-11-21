@@ -1,0 +1,29 @@
+{
+ "schema": 1,
+ "name": "scan-nested",
+ "description": "Files at any depth are found in one walk.",
+ "op": "scan",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "a/b/c/d.txt"
+   },
+   {
+    "path": "a/e.txt"
+   },
+   {
+    "path": "f.txt"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "files": [
+   "a/b/c/d.txt",
+   "a/e.txt",
+   "f.txt"
+  ],
+  "skipped_dirs": []
+ }
+}

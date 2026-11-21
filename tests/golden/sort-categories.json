@@ -1,0 +1,147 @@
+{
+ "schema": 1,
+ "name": "sort-categories",
+ "description": "Each extension maps to its category, case-insensitively; unknown and extensionless go to Other.",
+ "op": "plan_sort",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "a.JPG",
+    "size": 11
+   },
+   {
+    "path": "b.pdf",
+    "size": 12
+   },
+   {
+    "path": "c.Mp4",
+    "size": 13
+   },
+   {
+    "path": "d.flac",
+    "size": 14
+   },
+   {
+    "path": "e.zip",
+    "size": 15
+   },
+   {
+    "path": "f.msi",
+    "size": 16
+   },
+   {
+    "path": "g.py",
+    "size": 17
+   },
+   {
+    "path": "h.xyz",
+    "size": 18
+   },
+   {
+    "path": "noext",
+    "size": 19
+   },
+   {
+    "path": "i.heic",
+    "size": 20
+   },
+   {
+    "path": "j.csv",
+    "size": 21
+   },
+   {
+    "path": "k.iso",
+    "size": 22
+   },
+   {
+    "path": "l.ipynb",
+    "size": 23
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "moves": [
+   {
+    "src": "a.JPG",
+    "dst": "Images/a.JPG",
+    "size": 11,
+    "category": "Images"
+   },
+   {
+    "src": "b.pdf",
+    "dst": "Documents/b.pdf",
+    "size": 12,
+    "category": "Documents"
+   },
+   {
+    "src": "c.Mp4",
+    "dst": "Videos/c.Mp4",
+    "size": 13,
+    "category": "Videos"
+   },
+   {
+    "src": "d.flac",
+    "dst": "Audio/d.flac",
+    "size": 14,
+    "category": "Audio"
+   },
+   {
+    "src": "e.zip",
+    "dst": "Archives/e.zip",
+    "size": 15,
+    "category": "Archives"
+   },
+   {
+    "src": "f.msi",
+    "dst": "Installers/f.msi",
+    "size": 16,
+    "category": "Installers"
+   },
+   {
+    "src": "g.py",
+    "dst": "Code/g.py",
+    "size": 17,
+    "category": "Code"
+   },
+   {
+    "src": "h.xyz",
+    "dst": "Other/h.xyz",
+    "size": 18,
+    "category": "Other"
+   },
+   {
+    "src": "i.heic",
+    "dst": "Images/i.heic",
+    "size": 20,
+    "category": "Images"
+   },
+   {
+    "src": "j.csv",
+    "dst": "Documents/j.csv",
+    "size": 21,
+    "category": "Documents"
+   },
+   {
+    "src": "k.iso",
+    "dst": "Installers/k.iso",
+    "size": 22,
+    "category": "Installers"
+   },
+   {
+    "src": "l.ipynb",
+    "dst": "Code/l.ipynb",
+    "size": 23,
+    "category": "Code"
+   },
+   {
+    "src": "noext",
+    "dst": "Other/noext",
+    "size": 19,
+    "category": "Other"
+   }
+  ],
+  "recent_left": 0
+ }
+}

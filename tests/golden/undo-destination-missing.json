@@ -1,0 +1,88 @@
+{
+ "schema": 1,
+ "name": "undo-destination-missing",
+ "description": "A moved file that is gone is reported, the rest are restored.",
+ "op": "undo",
+ "params": {
+  "rounds": 1,
+  "after_apply": [
+   {
+    "do": "delete",
+    "path": "Images/a.png"
+   }
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a.png",
+    "size": 5
+   },
+   {
+    "path": "b.pdf",
+    "size": 6
+   },
+   {
+    "path": "c.txt",
+    "size": 7
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "applies": [
+   {
+    "count": 3,
+    "errors": []
+   }
+  ],
+  "log_after_apply": [
+   {
+    "moves": [
+     {
+      "src": "a.png",
+      "dst": "Images/a.png"
+     },
+     {
+      "src": "b.pdf",
+      "dst": "Documents/b.pdf"
+     },
+     {
+      "src": "c.txt",
+      "dst": "Documents/c.txt"
+     }
+    ],
+    "time_is_timestamp": true
+   }
+  ],
+  "tree_after_apply": {
+   "files": [
+    "Documents/b.pdf",
+    "Documents/c.txt",
+    "Images/a.png"
+   ],
+   "dirs": [
+    "Documents",
+    "Images"
+   ]
+  },
+  "can_undo": true,
+  "undo_count": 3,
+  "undo": {
+   "count": 2,
+   "errors": [
+    "a.png: no longer at <root>\\Images"
+   ]
+  },
+  "tree_after_undo": {
+   "files": [
+    "b.pdf",
+    "c.txt"
+   ],
+   "dirs": [
+    "Images"
+   ]
+  },
+  "log_len_after_undo": 0
+ }
+}

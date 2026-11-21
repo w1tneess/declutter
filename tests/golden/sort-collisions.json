@@ -1,0 +1,44 @@
+{
+ "schema": 1,
+ "name": "sort-collisions",
+ "description": "A clash with an existing file gets ' (1)', then ' (2)'; case-insensitive.",
+ "op": "plan_sort",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "a.png"
+   },
+   {
+    "path": "Images/a.png"
+   },
+   {
+    "path": "Images/a (1).png"
+   },
+   {
+    "path": "b.pdf"
+   },
+   {
+    "path": "Documents/B.PDF"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "moves": [
+   {
+    "src": "a.png",
+    "dst": "Images/a (2).png",
+    "size": 10,
+    "category": "Images"
+   },
+   {
+    "src": "b.pdf",
+    "dst": "Documents/b (1).pdf",
+    "size": 10,
+    "category": "Documents"
+   }
+  ],
+  "recent_left": 0
+ }
+}

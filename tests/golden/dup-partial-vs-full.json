@@ -1,0 +1,93 @@
+{
+ "schema": 1,
+ "name": "dup-partial-vs-full",
+ "description": "Same size and identical first/last 64 KiB but different middle is NOT a duplicate; a true big duplicate pair is.",
+ "op": "duplicates",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "p/a.bin",
+    "segments": [
+     [
+      "A",
+      70000
+     ],
+     [
+      "x",
+      50
+     ],
+     [
+      "A",
+      70000
+     ]
+    ]
+   },
+   {
+    "path": "p/b.bin",
+    "segments": [
+     [
+      "A",
+      70000
+     ],
+     [
+      "y",
+      50
+     ],
+     [
+      "A",
+      70000
+     ]
+    ]
+   },
+   {
+    "path": "q/c.bin",
+    "segments": [
+     [
+      "B",
+      70000
+     ],
+     [
+      "m",
+      50
+     ],
+     [
+      "B",
+      70000
+     ]
+    ],
+    "age_s": 1728000
+   },
+   {
+    "path": "q/d.bin",
+    "segments": [
+     [
+      "B",
+      70000
+     ],
+     [
+      "m",
+      50
+     ],
+     [
+      "B",
+      70000
+     ]
+    ],
+    "age_s": 1036800
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "groups": [
+   {
+    "size": 140050,
+    "files": [
+     "q/c.bin",
+     "q/d.bin"
+    ]
+   }
+  ]
+ }
+}

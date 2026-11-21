@@ -1,0 +1,55 @@
+{
+ "schema": 1,
+ "name": "sort-skip-rules",
+ "description": ".lnk/.url/.ini and dead downloads stay; files in subfolders and project subfolders are never sorted.",
+ "op": "plan_sort",
+ "params": {},
+ "tree": {
+  "files": [
+   {
+    "path": "go.lnk"
+   },
+   {
+    "path": "site.url"
+   },
+   {
+    "path": "conf.ini"
+   },
+   {
+    "path": "dead.crdownload"
+   },
+   {
+    "path": "dead2.part"
+   },
+   {
+    "path": "sub/in.txt"
+   },
+   {
+    "path": "proj/x.txt"
+   },
+   {
+    "path": "keep.txt"
+   },
+   {
+    "path": "hid.txt",
+    "attrs": [
+     "hidden"
+    ]
+   }
+  ],
+  "dirs": [
+   "proj/.git"
+  ]
+ },
+ "expected": {
+  "moves": [
+   {
+    "src": "keep.txt",
+    "dst": "Documents/keep.txt",
+    "size": 10,
+    "category": "Documents"
+   }
+  ],
+  "recent_left": 0
+ }
+}

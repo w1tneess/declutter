@@ -1,0 +1,89 @@
+{
+ "schema": 1,
+ "name": "undo-subbucket-cleanup",
+ "description": "Images/Screenshots is removed, and Images too if empty; Images stays if it still has files.",
+ "op": "undo",
+ "params": {
+  "rounds": 1,
+  "after_apply": [
+   {
+    "do": "write",
+    "path": "Images/extra.png",
+    "text": "kept"
+   }
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "Screenshot a.png",
+    "size": 5
+   },
+   {
+    "path": "Screenshot b.png",
+    "size": 6
+   },
+   {
+    "path": "pic.png",
+    "size": 7
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "applies": [
+   {
+    "count": 3,
+    "errors": []
+   }
+  ],
+  "log_after_apply": [
+   {
+    "moves": [
+     {
+      "src": "Screenshot a.png",
+      "dst": "Images/Screenshots/Screenshot a.png"
+     },
+     {
+      "src": "Screenshot b.png",
+      "dst": "Images/Screenshots/Screenshot b.png"
+     },
+     {
+      "src": "pic.png",
+      "dst": "Images/pic.png"
+     }
+    ],
+    "time_is_timestamp": true
+   }
+  ],
+  "tree_after_apply": {
+   "files": [
+    "Images/Screenshots/Screenshot a.png",
+    "Images/Screenshots/Screenshot b.png",
+    "Images/pic.png"
+   ],
+   "dirs": [
+    "Images",
+    "Images/Screenshots"
+   ]
+  },
+  "can_undo": true,
+  "undo_count": 3,
+  "undo": {
+   "count": 3,
+   "errors": []
+  },
+  "tree_after_undo": {
+   "files": [
+    "Images/extra.png",
+    "Screenshot a.png",
+    "Screenshot b.png",
+    "pic.png"
+   ],
+   "dirs": [
+    "Images"
+   ]
+  },
+  "log_len_after_undo": 0
+ }
+}

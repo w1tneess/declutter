@@ -1,0 +1,43 @@
+{
+ "schema": 1,
+ "name": "undo-nonlist-log",
+ "description": "A log that is not a list is treated as empty.",
+ "op": "undo",
+ "params": {
+  "raw_log": {
+   "oops": true
+  }
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a.txt"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "log_after_apply": [],
+  "tree_after_apply": {
+   "files": [
+    "a.txt"
+   ],
+   "dirs": []
+  },
+  "can_undo": false,
+  "undo_count": 0,
+  "undo": {
+   "count": 0,
+   "errors": [
+    "Nothing to undo."
+   ]
+  },
+  "tree_after_undo": {
+   "files": [
+    "a.txt"
+   ],
+   "dirs": []
+  },
+  "log_len_after_undo": 0
+ }
+}

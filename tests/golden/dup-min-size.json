@@ -1,0 +1,51 @@
+{
+ "schema": 1,
+ "name": "dup-min-size",
+ "description": "min_size drops groups of smaller files.",
+ "op": "duplicates",
+ "params": {
+  "min_size": 1000
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a.txt",
+    "text": "tiny"
+   },
+   {
+    "path": "b.txt",
+    "text": "tiny"
+   },
+   {
+    "path": "c.txt",
+    "segments": [
+     [
+      "Z",
+      5000
+     ]
+    ]
+   },
+   {
+    "path": "d.txt",
+    "segments": [
+     [
+      "Z",
+      5000
+     ]
+    ]
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "groups": [
+   {
+    "size": 5000,
+    "files": [
+     "c.txt",
+     "d.txt"
+    ]
+   }
+  ]
+ }
+}

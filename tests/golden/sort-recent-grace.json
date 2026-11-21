@@ -1,0 +1,47 @@
+{
+ "schema": 1,
+ "name": "sort-recent-grace",
+ "description": "With recent_hours the later of modified and created time decides; skipped files are counted.",
+ "op": "plan_sort",
+ "params": {
+  "recent_hours": 24
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "fresh2h.txt",
+    "age_s": 7200
+   },
+   {
+    "path": "old30h.txt",
+    "age_s": 108000
+   },
+   {
+    "path": "copy.txt",
+    "age_s": 864000,
+    "created_age_s": 3600
+   },
+   {
+    "path": "ancient.txt"
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "moves": [
+   {
+    "src": "ancient.txt",
+    "dst": "Documents/ancient.txt",
+    "size": 10,
+    "category": "Documents"
+   },
+   {
+    "src": "old30h.txt",
+    "dst": "Documents/old30h.txt",
+    "size": 10,
+    "category": "Documents"
+   }
+  ],
+  "recent_left": 2
+ }
+}

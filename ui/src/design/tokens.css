@@ -1,0 +1,161 @@
+/* Declutter design tokens: the only place colours, type, spacing, radii, elevation and motion are defined.
+   src/design/contrast.test.ts parses this file and fails if a text, control or focus pair drops below WCAG AA. */
+
+:root {
+  /* Type: Segoe UI Variable (Windows 11) with Segoe UI fallback. Scale 12 / 13 / 14 / 20 / 32. */
+  --font: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --fs-caption: 12px;
+  --fs-small: 13px;
+  --fs-body: 14px;
+  --fs-subtitle: 20px;
+  --fs-title: 32px;
+  --lh-tight: 1.25;
+  --lh-body: 1.45;
+  --fw-regular: 400;
+  --fw-semibold: 600;
+
+  /* Spacing: 4 / 8 grid. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+
+  /* Sizes. Rows, nav items and main actions are 44 px targets; other controls 36 px (44 px on touch). */
+  --control-h: 36px;
+  --target: 44px;
+  --sidebar-w: 248px;
+  --focus-w: 2px;
+
+  /* Radii (Windows 11: 4 for controls, 8 for cards and overlays). */
+  --r-control: 4px;
+  --r-card: 8px;
+  --r-overlay: 8px;
+  --r-pill: 999px;
+
+  /* Motion (Fluent durations). Reduced motion sets every duration to 0. */
+  --dur-fast: 83ms;
+  --dur-normal: 167ms;
+  --dur-slow: 250ms;
+  --ease-out: cubic-bezier(0, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.33, 0, 0.67, 1);
+
+  color-scheme: light;
+  /* Light theme. */
+  --bg: #f3f3f3;
+  --surface: #ffffff;
+  --surface-alt: #f9f9f9;
+  --surface-hover: #f0f0f0;
+  --surface-pressed: #e8e8e8;
+  --selected: #e6f0fa;
+  --border: #e3e3e3;
+  --border-control: #858585;
+  --text: #1b1b1b;
+  --text-muted: #5c5c5c;
+  --text-disabled: #6e6e6e;
+  --fill-disabled: #e6e6e6;
+  --accent: #005fb8;
+  --accent-hover: #004c94;
+  --on-accent: #ffffff;
+  --accent-text: #005a9e;
+  --accent-soft: #e6f0fa;
+  --danger: #c42b1c;
+  --danger-hover: #a12216;
+  --on-danger: #ffffff;
+  --danger-text: #b3261a;
+  --success-text: #0e700e;
+  --warning-text: #8a5300;
+  --track: #d6d6d6;
+  --focus: #000000;
+  --scrim: rgb(0 0 0 / 0.3);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-flyout: 0 8px 16px rgb(0 0 0 / 0.14);
+  --shadow-dialog: 0 32px 64px rgb(0 0 0 / 0.19), 0 2px 21px rgb(0 0 0 / 0.15);
+}
+
+@media (pointer: coarse) {
+  :root {
+    --control-h: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-normal: 0ms;
+    --dur-slow: 0ms;
+  }
+}
+
+/* Dark theme: follows the system unless the user picked Light; [data-theme="dark"] forces it. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #202020;
+    --surface: #2b2b2b;
+    --surface-alt: #272727;
+    --surface-hover: #323232;
+    --surface-pressed: #292929;
+    --selected: #19324a;
+    --border: #3a3a3a;
+    --border-control: #8f8f8f;
+    --text: #ffffff;
+    --text-muted: #c8c8c8;
+    --text-disabled: #a0a0a0;
+    --fill-disabled: #3a3a3a;
+    --accent: #60cdff;
+    --accent-hover: #3fb4ec;
+    --on-accent: #000000;
+    --accent-text: #8fdcff;
+    --accent-soft: #19324a;
+    --danger: #ff99a4;
+    --danger-hover: #f27e8c;
+    --on-danger: #000000;
+    --danger-text: #ffadb6;
+    --success-text: #6ccb5f;
+    --warning-text: #fce100;
+    --track: #4a4a4a;
+    --focus: #ffffff;
+    --scrim: rgb(0 0 0 / 0.5);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.2);
+    --shadow-flyout: 0 8px 16px rgb(0 0 0 / 0.26);
+    --shadow-dialog: 0 32px 64px rgb(0 0 0 / 0.37), 0 2px 21px rgb(0 0 0 / 0.37);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #202020;
+  --surface: #2b2b2b;
+  --surface-alt: #272727;
+  --surface-hover: #323232;
+  --surface-pressed: #292929;
+  --selected: #19324a;
+  --border: #3a3a3a;
+  --border-control: #8f8f8f;
+  --text: #ffffff;
+  --text-muted: #c8c8c8;
+  --text-disabled: #a0a0a0;
+  --fill-disabled: #3a3a3a;
+  --accent: #60cdff;
+  --accent-hover: #3fb4ec;
+  --on-accent: #000000;
+  --accent-text: #8fdcff;
+  --accent-soft: #19324a;
+  --danger: #ff99a4;
+  --danger-hover: #f27e8c;
+  --on-danger: #000000;
+  --danger-text: #ffadb6;
+  --success-text: #6ccb5f;
+  --warning-text: #fce100;
+  --track: #4a4a4a;
+  --focus: #ffffff;
+  --scrim: rgb(0 0 0 / 0.5);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.2);
+  --shadow-flyout: 0 8px 16px rgb(0 0 0 / 0.26);
+  --shadow-dialog: 0 32px 64px rgb(0 0 0 / 0.37), 0 2px 21px rgb(0 0 0 / 0.37);
+}

@@ -1,0 +1,77 @@
+{
+ "schema": 1,
+ "name": "undo-name-taken",
+ "description": "If the original name is taken again, undo restores to ' (1)'.",
+ "op": "undo",
+ "params": {
+  "rounds": 1,
+  "after_apply": [
+   {
+    "do": "write",
+    "path": "a.png",
+    "text": "new file"
+   }
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "a.png",
+    "size": 5
+   },
+   {
+    "path": "b.pdf",
+    "size": 6
+   }
+  ],
+  "dirs": []
+ },
+ "expected": {
+  "applies": [
+   {
+    "count": 2,
+    "errors": []
+   }
+  ],
+  "log_after_apply": [
+   {
+    "moves": [
+     {
+      "src": "a.png",
+      "dst": "Images/a.png"
+     },
+     {
+      "src": "b.pdf",
+      "dst": "Documents/b.pdf"
+     }
+    ],
+    "time_is_timestamp": true
+   }
+  ],
+  "tree_after_apply": {
+   "files": [
+    "Documents/b.pdf",
+    "Images/a.png"
+   ],
+   "dirs": [
+    "Documents",
+    "Images"
+   ]
+  },
+  "can_undo": true,
+  "undo_count": 2,
+  "undo": {
+   "count": 2,
+   "errors": []
+  },
+  "tree_after_undo": {
+   "files": [
+    "a (1).png",
+    "a.png",
+    "b.pdf"
+   ],
+   "dirs": []
+  },
+  "log_len_after_undo": 0
+ }
+}

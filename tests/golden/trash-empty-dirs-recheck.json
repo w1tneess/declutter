@@ -1,0 +1,73 @@
+{
+ "schema": 1,
+ "name": "trash-empty-dirs-recheck",
+ "description": "Deepest first; a folder that received a file since the scan or holds a project is refused; junk-only goes whole.",
+ "op": "trash_empty",
+ "params": {
+  "after_scan": [
+   {
+    "do": "write",
+    "path": "late/inner/new.txt",
+    "text": "arrived"
+   },
+   {
+    "do": "mkdir",
+    "path": "a/b/c/.git"
+   }
+  ]
+ },
+ "tree": {
+  "files": [
+   {
+    "path": "junkdir/desktop.ini",
+    "text": "x"
+   },
+   {
+    "path": "keep/f.txt"
+   }
+  ],
+  "dirs": [
+   "a/b/c",
+   "late/inner",
+   "nested/e1/e2"
+  ]
+ },
+ "expected": {
+  "scanned": [
+   "nested/e1/e2",
+   "late/inner",
+   "nested/e1",
+   "junkdir",
+   "nested",
+   "a/b/c",
+   "late",
+   "a/b",
+   "a"
+  ],
+  "result": {
+   "count": 4,
+   "errors": [
+    "inner: now contains files or is a project folder, skipped",
+    "c: now contains files or is a project folder, skipped",
+    "late: now contains files or is a project folder, skipped",
+    "b: now contains files or is a project folder, skipped",
+    "a: now contains files or is a project folder, skipped"
+   ]
+  },
+  "tree": {
+   "files": [
+    "keep/f.txt",
+    "late/inner/new.txt"
+   ],
+   "dirs": [
+    "a",
+    "a/b",
+    "a/b/c",
+    "a/b/c/.git",
+    "keep",
+    "late",
+    "late/inner"
+   ]
+  }
+ }
+}

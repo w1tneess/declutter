@@ -35,6 +35,8 @@ Decisions needed before the beta:
 - The `trash` crate deletes with `FOF_ALLOWUNDO | FOF_WANTNUKEWARNING` and no UI, and the code relies on it returning an error instead of destroying an item that cannot go to the Bin. That behaviour on a fixed drive with no Recycle Bin (for example Bin disabled for the drive) is assumed from the crate, not tested.
 - The similar-pictures side-by-side preview is a placeholder: the screen says "Side-by-side previews are coming in a later version" and points to Explorer.
 - Align versions: the Rust workspace is 0.3.0, `ui/package.json` says 1.0.0.
+- Moves across volumes (C: to D:) are copy + delete inside `MoveFileExW`. v0.2.2 (#21) creates the copy itself, removes a half-written copy, and removes its own copy if the original cannot be deleted. The Rust core leaves all three to Windows and has no test for them (a temp folder is one volume). Check by hand on a real C: to D: move, including a name clash and an open source file, before 1.0.
+- `move_to_free_name` (`paths.rs`, used by sort and undo) retries the next free name on a clash, like v0.2.2's `_move_new`, and `move_no_replace` now unwraps the Win32 error code so `AlreadyExists` can be recognised (`windows-result` 0.4 passes the whole HRESULT to `from_raw_os_error`). The same-volume tests are written but have not been run: CI is the first compile. Not covered: a race at `apply_moves` / `undo_last` level, and the cross-volume cases above.
 
 ## R0. Blockers (no new features until these are done)
 - [x] Merge #3 to #8 in order; retarget #8 to main after #7 merges.

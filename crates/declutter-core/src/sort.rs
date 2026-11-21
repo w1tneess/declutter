@@ -10,10 +10,10 @@ use regex::Regex;
 use crate::ctx::Ctx;
 use crate::model::{ActionResult, Move, SortPlan};
 use crate::paths::{
-    ext_lower, is_inside, last_touched, leave_alone, require_root, through_link, unique_path,
-    DEAD_EXTS, SKIP_SORT_EXTS,
+    ext_lower, is_inside, last_touched, leave_alone, move_to_free_name, require_root, through_link,
+    unique_path, DEAD_EXTS, SKIP_SORT_EXTS,
 };
-use crate::platform::{filetime_to_unix, move_no_replace};
+use crate::platform::filetime_to_unix;
 use crate::undo;
 use crate::walk::Entry;
 
@@ -215,10 +215,7 @@ pub fn apply_moves(
         let moved = dst
             .parent()
             .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| {
-                let fin = unique_path(dst, &HashSet::new());
-                move_no_replace(src, &fin).map(|()| fin)
-            });
+            .and_then(|()| move_to_free_name(src, dst));
         match moved {
             Ok(fin) => done.push(Move {
                 dst: dto_path(&fin),

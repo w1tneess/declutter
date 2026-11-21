@@ -40,8 +40,9 @@ else Other. `.lnk .url .ini` and dead downloads (.crdownload/.part) are never mo
 case-insensitively at the start of the stem only. Name clashes (existing files and earlier planned moves, compared
 case-insensitively) get ` (1)`, ` (2)`... Plan is sorted by source path. `recent_hours` (0..72, 0 = off) leaves
 files whose later of modified and created time is newer; they are counted. Apply re-checks each file is still a
-regular file, not left-alone, not recent, inside the root; moves never overwrite; one failure never aborts; the
-undo log is written only for moves that happened.
+regular file, not left-alone, not recent, inside the root; moves never overwrite, and a name taken between the
+check and the move (another program, a second run) gets the next free name, up to 100 tries, then an error for
+that file; one failure never aborts; the undo log is written only for moves that happened.
 
 **Undo.** Log at `%LOCALAPPDATA%\Declutter\undo.json`: a JSON list of `{"time": "YYYY-MM-DD HH:MM:SS",
 "moves": [{"src", "dst"}]}`, newest last, capped at 20 batches, written atomically (temp + replace). An old

@@ -20,7 +20,7 @@ gh attestation verify .\Declutter-Setup.exe --repo w1tneess/declutter
 The checksum only proves the file matches what was published; the attestation proves it was built by this repository's workflow.
 
 ## Declutter 1.0 (in development)
-A rewrite is in progress on the branch `v1-rust`: a Rust core, a Tauri 2 shell and a React/TypeScript UI, with the same safety rules (`SPEC.md`). It is **not released**; the install steps above are still for v0.2.2, which stays the shipping app (and the test oracle for the rewrite) until 1.0 is out. A first beta is planned as v0.3.0.
+A rewrite is in progress in `crates/`, `src-tauri/` and `ui/`: a Rust core, a Tauri 2 shell and a React/TypeScript UI, with the same safety rules (`SPEC.md`). It is **not released**; the install steps above are still for v0.2.2, which stays the shipping app (and the test oracle for the rewrite) until 1.0 is out. A first beta is planned as v0.3.0.
 
 New on that branch: similar-picture groups, sort presets (built-in Downloads, Photos, Work, plus your own), CSV export, a "space freed" tally, and an optional weekly reminder (a Task Scheduler task that runs `declutter --remind`; it only scans and shows a notification, it never moves anything). Not yet ported from v0.2.2: the right-click "Tidy with Declutter" entry, opening on a folder given on the command line, and the diagnostics log. Design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`DESIGN.md`](DESIGN.md). Plan and status: [`ROADMAP.md`](ROADMAP.md).
 

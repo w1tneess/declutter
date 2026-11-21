@@ -9,7 +9,7 @@ Rules for every item: tests first, core.py stays free of GUI imports, no hex col
 - **v0.2.1** (2026-10-19): R1 to R5 below: trust cues, local diagnostics log, pin from the Sort row, project and portable-app boundary, UI polish.
 - **v0.2.2** (2026-10-20): the 300-row list-rebuild freeze fix (R5).
 
-## 1.0 rewrite: Rust core + Tauri 2 + React UI (branch `v1-rust`)
+## 1.0 rewrite: Rust core + Tauri 2 + React UI (`crates/`, `src-tauri/`, `ui/`)
 Behaviour is fixed by `docs/CONTRACT.md` and proven by golden fixtures generated from the Python app. The Python app stays as the oracle and the shipping product until 1.0 is released. A beta is planned as v0.3.0 (the workspace version is already 0.3.0).
 
 | | Milestone | Status |

@@ -41,7 +41,7 @@ Out of scope: folder watching (the reminder scans once a week, it does not watch
 - Style: rounded corners, generous spacing, one accent colour, a single font (Segoe UI), clear empty states ("Nothing to clean. Nice.").
 
 ## Tech
-- **1.0 (in development on branch `v1-rust`):** Rust core (`crates/declutter-core`, no UI imports) + Tauri 2 shell (`src-tauri/`) + React/TypeScript UI (`ui/`). The Python v0.2.2 app in `src/` is still the shipping product and stays as the behavioural oracle (`docs/CONTRACT.md`, golden fixtures in `tests/golden/`) until 1.0 is released. See `docs/ARCHITECTURE.md`.
+- **1.0 (in development, not released):** Rust core (`crates/declutter-core`, no UI imports) + Tauri 2 shell (`src-tauri/`) + React/TypeScript UI (`ui/`). The Python v0.2.2 app in `src/` is still the shipping product and stays as the behavioural oracle (`docs/CONTRACT.md`, golden fixtures in `tests/golden/`) until 1.0 is released. See `docs/ARCHITECTURE.md`.
 - **v0.2.2 Python app:** Python 3.12, `customtkinter`, `send2trash`. Core logic is in `core.py` with no GUI imports.
 - Why CustomTkinter: small, modern enough, simple to package. Trade-off: less polished than Qt. If the look is not good enough, switch the UI layer to PySide6 (the logic stays untouched, installer grows to roughly 60-100 MB).
 - Packaging: PyInstaller **onedir** (not onefile). Onefile unpacks to a temp folder on every launch, starts slowly and triggers more antivirus false positives.

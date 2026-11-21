@@ -11,6 +11,14 @@ A simple Windows app that tidies a messy folder. It previews everything first an
 
 Uninstall from Windows Settings > Apps. Website source is in `website/` (deployed with Vercel, see `vercel.json`).
 
+### Verify your download (optional)
+Every release carries a `SHA256SUMS.txt` and a signed build-provenance attestation made by the release workflow.
+```
+Get-FileHash .\Declutter-Setup.exe -Algorithm SHA256     # compare with the line in SHA256SUMS.txt
+gh attestation verify .\Declutter-Setup.exe --repo w1tneess/declutter
+```
+The checksum only proves the file matches what was published; the attestation proves it was built by this repository's workflow.
+
 ## Declutter 1.0 (in development)
 A rewrite is in progress on the branch `v1-rust`: a Rust core, a Tauri 2 shell and a React/TypeScript UI, with the same safety rules (`SPEC.md`). It is **not released**; the install steps above are still for v0.2.2, which stays the shipping app (and the test oracle for the rewrite) until 1.0 is out. A first beta is planned as v0.3.0.
 

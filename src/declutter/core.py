@@ -330,6 +330,55 @@ def unique_path(dst: Path, taken: set[str] | None = None) -> Path:
     return cand
 
 
+def _discard(p: Path) -> None:
+    try:
+        os.unlink(p)
+    except OSError:
+        pass
+
+
+def _copy_new(src: Path, dst: Path) -> None:
+    """Copy src to dst, which must not exist: mode 'x' makes the check and the create one step,
+    so an existing file is never replaced. A half-written copy is removed again."""
+    created = False
+    try:
+        with open(src, "rb") as s, open(dst, "xb") as d:
+            created = True
+            shutil.copyfileobj(s, d)
+        shutil.copystat(src, dst)
+    except BaseException:
+        if created:
+            _discard(dst)
+        raise
+
+
+def _move_new(src: Path, base: Path) -> Path:
+    """Move src to the first free name for `base` and return the path it ended up at. Never overwrites,
+    even if that name is taken between the check and the move (another program, a second run): it
+    just uses the next free one. shutil.move cannot promise this: when its rename fails it falls back
+    to copy-and-delete, and that copy replaces an existing file."""
+    for _ in range(100):  # bounded: a name that exists() cannot see (dangling link) must not loop forever
+        dst = unique_path(base)
+        try:
+            os.rename(src, dst)  # on Windows an existing dst raises FileExistsError instead of being replaced
+            return dst
+        except FileExistsError:
+            continue
+        except OSError:
+            pass  # most often another disk: copy instead
+        try:
+            _copy_new(src, dst)
+        except FileExistsError:
+            continue
+        try:
+            os.unlink(src)
+        except BaseException:
+            _discard(dst)  # could not remove the original (in use?): keep exactly one copy
+            raise
+        return dst
+    raise FileExistsError(f"no free name for {base.name}")
+
+
 def to_recycle_bin(paths: list[Path], root: str | Path | None = None) -> tuple[int, list[str]]:
     """Send paths to the Recycle Bin. With `root`, anything outside it is refused."""
     base = require_root(root) if root is not None else None
@@ -432,8 +481,7 @@ def apply_moves(moves: list[Move], root: str | Path | None = None,
                 errors.append(f"{m.src.name}: touched in the last {recent_hours} hours, skipped")
                 continue
             m.dst.parent.mkdir(parents=True, exist_ok=True)
-            final = unique_path(m.dst)
-            shutil.move(str(m.src), str(final))
+            final = _move_new(m.src, m.dst)
             done.append(Move(m.src, final))
         except Exception as e:
             errors.append(f"{m.src.name}: {e}")
@@ -536,7 +584,7 @@ def undo_last() -> tuple[int, list[str]]:
                 errors.append(f"{dst.name}: no longer at {dst.parent}")
             else:
                 src.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(dst), str(unique_path(src)))
+                _move_new(dst, src)
                 restored += 1
                 for d in (dst.parent, dst.parent.parent)[:len(_bucket(dst))]:
                     try:

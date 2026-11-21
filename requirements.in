@@ -1,0 +1,3 @@
+# Runtime dependencies. Edit this file, then regenerate the hash-pinned lock (see requirements-dev.in).
+customtkinter
+send2trash

@@ -135,14 +135,26 @@ fn known_folder_path(id: &GUID) -> Option<PathBuf> {
 }
 
 /// Move a file without ever replacing an existing one (`std::fs::rename` replaces). As with Python's
-/// `shutil.move`, a move to another volume becomes copy + delete.
+/// `shutil.move`, a move to another volume becomes copy + delete. Fails with `ErrorKind::AlreadyExists`
+/// when `dst` exists.
 pub fn move_no_replace(src: &Path, dst: &Path) -> io::Result<()> {
     let (s, d) = (
         HSTRING::from(src.as_os_str()),
         HSTRING::from(dst.as_os_str()),
     );
     // SAFETY: both HSTRINGs are NUL-terminated and outlive the call, which only reads them.
-    unsafe { MoveFileExW(&s, &d, MOVEFILE_COPY_ALLOWED) }.map_err(io::Error::from)
+    unsafe { MoveFileExW(&s, &d, MOVEFILE_COPY_ALLOWED) }.map_err(win32_to_io)
+}
+
+/// `windows-result` 0.4 converts its error with `from_raw_os_error(hresult)`: the whole HRESULT, where Rust expects
+/// the Win32 code, so `kind()` cannot match `AlreadyExists`. Unwrap the Win32 code here (facility 7 HRESULTs).
+fn win32_to_io(e: windows::core::Error) -> io::Error {
+    let hr = e.code().0 as u32;
+    if hr >> 16 == 0x8007 {
+        io::Error::from_raw_os_error((hr & 0xFFFF) as i32)
+    } else {
+        io::Error::from(e)
+    }
 }
 
 const FILETIME_UNIX_OFFSET_SECS: f64 = 11_644_473_600.0;
@@ -236,5 +248,17 @@ mod tests {
             SystemPlatform.drive_kind(Path::new(r"\\server\share\x.txt")),
             DriveKind::Network
         );
+    }
+
+    #[test]
+    fn a_move_never_replaces_an_existing_file() {
+        let t = tempfile::tempdir().unwrap();
+        let (src, dst) = (t.path().join("a.txt"), t.path().join("b.txt"));
+        std::fs::write(&src, "new").unwrap();
+        std::fs::write(&dst, "old").unwrap();
+        let err = move_no_replace(&src, &dst).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(std::fs::read_to_string(&dst).unwrap(), "old");
+        assert_eq!(std::fs::read_to_string(&src).unwrap(), "new");
     }
 }

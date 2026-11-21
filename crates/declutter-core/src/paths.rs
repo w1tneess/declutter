@@ -4,10 +4,12 @@
 
 use std::collections::HashSet;
 use std::ffi::OsString;
+use std::io;
 use std::path::{Component, Path, PathBuf, Prefix};
 
 use crate::ctx::Ctx;
 use crate::model::FolderCheck;
+use crate::platform::move_no_replace;
 use crate::walk::Entry;
 
 /// Windows attribute bits used by the rules.
@@ -238,6 +240,36 @@ pub fn unique_path(dst: &Path, taken: &HashSet<String>) -> PathBuf {
     cand
 }
 
+/// Names tried before giving up, so a name `unique_path` cannot see never loops forever.
+const MOVE_ATTEMPTS: u32 = 100;
+
+/// Move `src` to the first free name for `base` and return where it ended up. Never replaces a file, even if
+/// that name is taken between the check and the move (another program, a second run): the next free name is
+/// tried. Port of v0.2.2's `_move_new`, same-volume part; a move across volumes is left to `move_no_replace`.
+pub fn move_to_free_name(src: &Path, base: &Path) -> io::Result<PathBuf> {
+    move_to_free_name_with(src, base, move_no_replace)
+}
+
+/// `move_to_free_name` with the mover passed in, so a test can make another program win the race.
+fn move_to_free_name_with(
+    src: &Path,
+    base: &Path,
+    mut mover: impl FnMut(&Path, &Path) -> io::Result<()>,
+) -> io::Result<PathBuf> {
+    for _ in 0..MOVE_ATTEMPTS {
+        let dst = unique_path(base, &HashSet::new());
+        match mover(src, &dst) {
+            Ok(()) => return Ok(dst),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        format!("no free name for {}", base.display()),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,5 +379,85 @@ mod tests {
             unique_path(&noext, &HashSet::new()),
             dir.path().join("noext (1)")
         );
+    }
+
+    // The tests below follow v0.2.2's tests/test_move_race.py, same volume only: a move across volumes
+    // (copy, then delete) cannot be set up in a temp folder, so it is checked by hand (ROADMAP).
+
+    fn read(path: &Path) -> String {
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    #[test]
+    fn a_free_name_is_used_as_it_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let (src, base) = (dir.path().join("a.txt"), dir.path().join("b.txt"));
+        std::fs::write(&src, "mine").unwrap();
+        assert_eq!(move_to_free_name(&src, &base).unwrap(), base);
+        assert_eq!(read(&base), "mine");
+        assert!(!src.exists());
+    }
+
+    #[test]
+    fn a_taken_name_gets_the_next_free_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let (src, base) = (dir.path().join("a.txt"), dir.path().join("b.txt"));
+        std::fs::write(&src, "mine").unwrap();
+        std::fs::write(&base, "theirs").unwrap();
+        let end = move_to_free_name(&src, &base).unwrap();
+        assert_eq!(end, dir.path().join("b (1).txt"));
+        assert_eq!(read(&base), "theirs");
+        assert_eq!(read(&end), "mine");
+    }
+
+    #[test]
+    fn a_name_taken_between_the_check_and_the_move_never_loses_that_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let (src, base) = (dir.path().join("src.txt"), dir.path().join("x.txt"));
+        std::fs::write(&src, "mine").unwrap();
+        let mut calls = 0;
+        let end = move_to_free_name_with(&src, &base, |s, d| {
+            calls += 1;
+            if calls == 1 {
+                std::fs::write(d, "theirs").unwrap(); // another program takes the name first
+            }
+            move_no_replace(s, d)
+        })
+        .unwrap();
+        assert_eq!(end, dir.path().join("x (1).txt"));
+        assert_eq!(read(&base), "theirs");
+        assert_eq!(read(&end), "mine");
+        assert!(!src.exists());
+    }
+
+    #[test]
+    fn a_name_that_never_frees_up_is_an_error_not_a_hang() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("s.txt");
+        std::fs::write(&src, "s").unwrap();
+        let mut calls = 0;
+        let err = move_to_free_name_with(&src, &dir.path().join("y.txt"), |_, _| {
+            calls += 1;
+            Err(io::Error::from(io::ErrorKind::AlreadyExists))
+        })
+        .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(calls, MOVE_ATTEMPTS);
+        assert_eq!(read(&src), "s");
+    }
+
+    #[test]
+    fn any_other_error_stops_at_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("s.txt");
+        std::fs::write(&src, "s").unwrap();
+        let mut calls = 0;
+        let err = move_to_free_name_with(&src, &dir.path().join("z.txt"), |_, _| {
+            calls += 1;
+            Err(io::Error::from(io::ErrorKind::PermissionDenied))
+        })
+        .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(calls, 1);
     }
 }

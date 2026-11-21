@@ -8,8 +8,8 @@ use serde_json::{json, Value};
 
 use crate::ctx::Ctx;
 use crate::model::{ActionResult, Move, UndoInfo};
-use crate::paths::{has_protected_part, unique_path};
-use crate::platform::{local_time_string, move_no_replace, parse_local_time};
+use crate::paths::{has_protected_part, move_to_free_name};
+use crate::platform::{local_time_string, parse_local_time};
 use crate::settings::write_atomic;
 
 const LOG_NAME: &str = "undo.json";
@@ -128,7 +128,7 @@ pub fn undo_last(ctx: &Ctx) -> ActionResult {
         let moved = src
             .parent()
             .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| move_no_replace(dst, &unique_path(src, &Default::default())));
+            .and_then(|()| move_to_free_name(dst, src).map(drop));
         if let Err(e) = moved {
             errors.push(format!("{name}: {e}"));
             continue;

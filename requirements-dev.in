@@ -4,6 +4,9 @@
 #   pip-compile --generate-hashes --allow-unsafe --output-file requirements.txt requirements.in
 #   pip-compile --generate-hashes --allow-unsafe --output-file requirements-dev.txt requirements-dev.in
 # Add --uploaded-prior-to <ISO date> (pip >= 26) to stay clear of just-published releases.
+# Do not merge Dependabot's pip PRs for the .txt locks: it resolves on Linux and drops the Windows-only packages
+# (colorama, pefile, pywin32-ctypes), so a hash-pinned install fails on Windows. Regenerate with the commands above,
+# e.g. add --upgrade-package pytest==X.Y.Z to bump one package.
 -c requirements.txt
 -r requirements.in
 pytest

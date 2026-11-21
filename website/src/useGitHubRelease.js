@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
 
 const REPO = 'w1tneess/declutter';
-const FALLBACK_VERSION = 'v1.0.0';
 const REPO_URL = `https://github.com/${REPO}`;
+// Until the lookup answers (or if it fails) these links still reach the latest release.
+const LATEST_SETUP = `${REPO_URL}/releases/latest/download/Declutter-Setup.exe`;
+const LATEST_PORTABLE = `${REPO_URL}/releases/latest/download/Declutter-portable.zip`;
 
 export function useGitHubRelease() {
   const [data, setData] = useState({
-    version: FALLBACK_VERSION,
+    version: null,
     releaseDate: null,
-    setupUrl: `${REPO_URL}/releases/latest`,
-    portableUrl: `${REPO_URL}/releases/latest`,
+    setupUrl: LATEST_SETUP,
+    portableUrl: LATEST_PORTABLE,
     setupSize: null,
     portableSize: null,
     downloadCount: 0,
-    notes: 'Initial production release for Windows 10 & 11.',
+    notes: '',
     isLive: false,
     loading: true,
   });
@@ -72,14 +74,7 @@ export function useGitHubRelease() {
           });
         }
       } catch {
-        if (mounted) {
-          setData(prev => ({
-            ...prev,
-            setupUrl: `${REPO_URL}/releases/download/${FALLBACK_VERSION}/Declutter-Setup.exe`,
-            portableUrl: `${REPO_URL}/releases/download/${FALLBACK_VERSION}/Declutter-portable.zip`,
-            loading: false,
-          }));
-        }
+        if (mounted) setData(prev => ({ ...prev, loading: false }));
       }
     }
 

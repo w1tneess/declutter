@@ -1,16 +1,23 @@
-# React + Vite
+# Declutter website
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The site at the project's Vercel deployment: React 19 + Vite 8, one page. The root `vercel.json` builds it with
+`--prefix website`; `website/vercel.json` mirrors the security headers.
 
-Currently, two official plugins are available:
+## Commands
+Run from `website/`:
+- `npm ci`: install from the lockfile
+- `npm run dev`: dev server
+- `npm run lint`: oxlint (must pass)
+- `npm run build`: production build into `dist/` (must pass)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Layout
+- `src/App.jsx`: the page (hero, try-it, tools table, safety, screenshots, sort folders, download, FAQ)
+- `src/HeroFolder.jsx`: the simulated Downloads window in the hero
+- `src/Demo.jsx`: the try-it simulation of the four tools; it moves no real files
+- `src/data.js`: categories, sort rules and sample data, mirroring `src/declutter/core.py`
+- `src/useGitHubRelease.js`: the only network request, to the public GitHub Releases API
+- `src/index.css`: all styles; colour and type tokens at the top, light and dark from the Windows setting
+- `public/`: the app screenshots, icon and the social-share image
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Rules
+See [`AGENTS.md`](AGENTS.md): what the site may claim, the banned words, no third-party hosts, one change per PR.

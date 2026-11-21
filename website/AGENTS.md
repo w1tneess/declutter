@@ -46,18 +46,18 @@ If a claim is not in those two files, do not write it. Ask the owner.
   auto-update, Dropbox or Google Drive handling, macOS or Linux, AI.
 - Plain words, short sentences, no jargon, no emoji in headings or toasts (the app has none).
 
-## Claims on the current site to fix first (`src/App.jsx`, line numbers as of this brief)
-| Line | Now says | Problem |
-|---|---|---|
-| ~551-552 | "100% Recycle Bin safety" | Not on USB/network drives; Undo is not Recycle Bin |
-| ~1322 | "makes catastrophic file loss impossible" | Overpromise |
-| ~1373, ~1381 | "100% restorable", "100% Windows Recycle Bin Guarantee" | Same; restoring is done from the Bin |
-| ~560, ~1388 | "Instant 1-Click Undo ... recovery point" | Last sort only; skips changed files |
-| ~1437 | "external USB storage" | Add that removals are refused there |
-| ~1149, ~1159 | "guarantee true duplicates", "permanent keeper" | Say "compared by SHA-256"; keeper is a default the user can change |
-| ~1330-1360 | Competitor column ("black boxes", "ad upsells") | Unverifiable; remove |
-| ~266, ~575 | "100% private in your browser" demo | Keep, but label it a simulation: the demo is not the app and moves no real files |
-| missing | v0.2.0 features | Add: likely leftovers, possible re-downloads, screenshot sub-folders, "Never touch" list, right-click "Tidy with Declutter" |
+## Claims that must stay fixed
+The 2026-11 redesign removed these. Do not bring them back, and check any new copy against them:
+- No "100%", "guarantee", "impossible" or "instant". Recycle Bin removal is local fixed drives only; USB and network drives are refused.
+- Undo is the **last sort only** and skips files changed since. It does not restore Recycle Bin items; the Bin does.
+- Duplicates are "compared by SHA-256" (after size and the first and last 64 KB). The keeper is a default the user can change.
+- No competitor comparison. Describe Declutter only.
+- The try-it demo is labelled a simulation and moves no real files.
+- The v0.2.0 features are covered: likely leftovers, possible re-downloads, screenshot sub-folders, "Never touch", the right-click "Tidy with Declutter" entry (FAQ).
+- The page makes one request, to the GitHub Releases API (`useGitHubRelease.js`). No third-party fonts or scripts; `vercel.json` (root and `website/`) allows only the site itself and `api.github.com`.
+
+## Keeping the site true to the app
+`src/data.js` mirrors `CATEGORIES`, the sort rules and the left-alone rules in `src/declutter/core.py`. When those change, change `data.js` and the folder table in `src/App.jsx` in the same PR. Vercel previews sit behind a login, so check header changes by serving `dist` with the headers from `vercel.json` and looking for CSP violations in the console.
 
 ## Design
 Match the app's calm look (see `DESIGN.md`, `src/declutter/theme.py`): accent `#0071E3`, Segoe UI / system font,
